@@ -82,7 +82,7 @@ For a public test endpoint outside Railway, run this image on a provider that gi
 2. Volt Rewards configures Railway server env vars, including Neon runtime DB URL and BUSY connector credentials.
 3. Volt Rewards shares the test API base URL and BUSY connector credentials with the BUSY developer through a secure channel.
 4. The BUSY developer configures the BUSY-side connector/sync job with:
-   - API base URL: `https://<railway-public-domain>/api`
+   - API base URL: `https://volt-rewardsapi-production.up.railway.app/api`
    - `x-volt-client-id`
    - `x-volt-api-key`
 5. The BUSY connector first calls `GET /integrations/busy/v1/health` to confirm connectivity/authentication.
@@ -96,7 +96,7 @@ For a public test endpoint outside Railway, run this image on a provider that gi
 
 Share:
 
-- API base URL: `https://<volt-railway-test-domain>/api`
+- API base URL: `https://volt-rewardsapi-production.up.railway.app/api`
 - Header name: `x-volt-client-id`
 - Header value for the test connector
 - Header name: `x-volt-api-key`

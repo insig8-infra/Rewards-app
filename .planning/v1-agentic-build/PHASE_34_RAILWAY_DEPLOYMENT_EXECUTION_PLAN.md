@@ -1,6 +1,6 @@
 # Phase 34 - Railway Deployment Execution
 
-Status: In progress  
+Status: Complete
 Started: 2026-07-18
 
 ## Objective
@@ -22,7 +22,7 @@ Deploy the Railway Test API from the GitHub repo, configure Railway service vari
 | Railway authentication | Railway UI path is in use. Agent still does not have Railway CLI access/token, so deploy/domain verification depends on user-provided Railway UI results. |
 | Railway plan | Trial is acceptable for the first proof if public domain, deploy, and Neon outbound connectivity work. Upgrade only if Railway blocks or sleeps the needed test service. |
 | Runtime secrets | Generated locally and exported to ignored `.env.railway.local`; user confirmed the values were copied/imported into Railway Variables. |
-| Public API URL | Not known until Railway service public domain is generated. |
+| Public API URL | Resolved: `https://volt-rewardsapi-production.up.railway.app/api`. |
 
 ## Eval Criteria
 
@@ -40,6 +40,6 @@ Deploy the Railway Test API from the GitHub repo, configure Railway service vari
 - [x] Authenticate Railway access for agent or complete Railway UI connection manually.
 - [x] Configure Railway project/service from GitHub.
 - [x] Configure Railway Variables.
-- [ ] Generate Railway public domain.
-- [ ] Verify health endpoints.
-- [ ] Update BUSY handoff with actual test API base URL.
+- [x] Generate Railway public domain.
+- [x] Verify health endpoints.
+- [x] Update BUSY handoff with actual test API base URL.

@@ -13,15 +13,15 @@ We want the live integration to work through API calls, not manual file export/i
 
 Because the integration mode is PUSH only, please create the BUSY-side API/sync capability that can call Volt Rewards whenever relevant BUSY data changes.
 
-Volt Rewards now has a test receiving API shape ready for connector testing. The test receiver will be deployed on Railway as a public HTTPS endpoint for live connector testing. Please keep the destination API base URL and credentials configurable, not hard-coded, so the same BUSY connector can point first to the test environment and later to staging/production.
+Volt Rewards now has a test receiving API ready for connector testing. The test receiver is deployed on Railway as a public HTTPS endpoint for live connector testing. Please keep the destination API base URL and credentials configurable, not hard-coded, so the same BUSY connector can point first to the test environment and later to staging/production.
 
-The API base URL includes the `/api` prefix. For example, once Volt Rewards provides a test host, the BUSY connector should call:
+The API base URL includes the `/api` prefix. For the current test deployment, the BUSY connector should call:
 
-`https://<volt-railway-test-domain>/api/integrations/busy/v1/health`
+`https://volt-rewardsapi-production.up.railway.app/api/integrations/busy/v1/health`
 
 | Environment | API base URL |
 | --- | --- |
-| Test API Deployment | `https://<volt-railway-test-domain>/api` after Volt Rewards deploys the Railway test API and configures connector credentials |
+| Test API Deployment | `https://volt-rewardsapi-production.up.railway.app/api` |
 | Deployed staging | `https://<volt-staging-api-host>/api`, using the same paths below unless Volt Rewards confirms a new version |
 | Production | `https://<volt-production-api-host>/api`, using the same paths below unless Volt Rewards confirms a new version |
 
@@ -42,6 +42,8 @@ Every BUSY call must include these headers:
 | `x-volt-api-key` | Shared secret for that environment |
 
 Volt Rewards will generate the test `x-volt-client-id` and `x-volt-api-key` for connector testing and share them separately from this document. Please store these values securely and make them replaceable per environment.
+
+The test connectivity endpoint has been verified by Volt Rewards. The BUSY developer should first call `GET /integrations/busy/v1/health` with the shared test headers before sending voucher or item master data.
 
 We need this API/sync capability for these purposes:
 
