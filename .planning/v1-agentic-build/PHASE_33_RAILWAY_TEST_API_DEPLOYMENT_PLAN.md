@@ -42,6 +42,6 @@ Make Railway the selected Test API deployment path for BUSY connector testing, u
 - [x] Record architecture decision and open-question update.
 - [ ] Run build/tests.
 - [x] Generate local test secrets under exact API env names.
-- [ ] Configure Git remote safely.
-- [ ] Push repo to GitHub if token works.
-- [ ] Record output and trajectory eval.
+- [x] Configure Git remote safely.
+- [ ] Push repo to GitHub if token works. Blocked: GitHub returned 403 permission denied for the provided token/repo.
+- [x] Record output and trajectory eval.
