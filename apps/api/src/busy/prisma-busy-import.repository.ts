@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  ACTOR_ROLE,
   BUSY_RETURN_ALLOCATION_TYPE,
   DomainError,
   resolveItemCodeStatus,
@@ -18,6 +19,9 @@ import type {
 } from "./busy-import.repository.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 
+export const BUSY_MOCK_IMPORT_ACTION = "BUSY_MOCK_IMPORT";
+export const BUSY_INTEGRATION_IMPORT_ACTION = "BUSY_INTEGRATION_IMPORT";
+
 @Injectable()
 export class PrismaBusyImportRepository implements BusyImportRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,7 +29,7 @@ export class PrismaBusyImportRepository implements BusyImportRepository {
   async getLatestInvoiceSyncAt(): Promise<Date | null> {
     const latestSync = await this.prisma.auditEvent.findFirst({
       where: {
-        action: "BUSY_MOCK_IMPORT",
+        action: { in: [BUSY_MOCK_IMPORT_ACTION, BUSY_INTEGRATION_IMPORT_ACTION] },
         targetType: "BUSY_INVOICE",
       },
       orderBy: { createdAt: "desc" },
@@ -175,9 +179,7 @@ export class PrismaBusyImportRepository implements BusyImportRepository {
 
       await tx.auditEvent.create({
         data: {
-          ...(actor ? { actorRole: actor.role } : { actorRole: "SYSTEM" }),
-          surface: actor ? "ADMIN_WEB" : "BACKEND_JOB",
-          action: "BUSY_MOCK_IMPORT",
+          ...resolveBusyInvoiceImportAuditContext(actor),
           targetType: "BUSY_INVOICE",
           targetId: busyInvoice.id,
           ...(actor?.userId ? { actorUserId: actor.userId } : {}),
@@ -370,7 +372,7 @@ export class PrismaBusyImportRepository implements BusyImportRepository {
       await tx.auditEvent.create({
         data: {
           ...(actor ? { actorRole: actor.role } : { actorRole: "SYSTEM" }),
-          surface: actor ? "ADMIN_WEB" : "BACKEND_JOB",
+          surface: actor?.role === ACTOR_ROLE.SYSTEM || !actor ? "BACKEND_JOB" : "ADMIN_WEB",
           action: "BUSY_RETURN_IMPORT",
           targetType: "BUSY_RETURN_VOUCHER",
           targetId: createdReturn.id,
@@ -397,6 +399,19 @@ export class PrismaBusyImportRepository implements BusyImportRepository {
       };
     });
   }
+}
+
+export function resolveBusyInvoiceImportAuditContext(actor?: AuthenticatedActor): {
+  readonly actorRole: "OWNER" | "STAFF" | "CONTRACTOR" | "TEAM_MEMBER" | "SYSTEM";
+  readonly surface: "ADMIN_WEB" | "BACKEND_JOB";
+  readonly action: typeof BUSY_MOCK_IMPORT_ACTION | typeof BUSY_INTEGRATION_IMPORT_ACTION;
+} {
+  const isSystemIntegrationActor = actor?.role === ACTOR_ROLE.SYSTEM;
+  return {
+    actorRole: actor?.role ?? ACTOR_ROLE.SYSTEM,
+    surface: actor && !isSystemIntegrationActor ? "ADMIN_WEB" : "BACKEND_JOB",
+    action: isSystemIntegrationActor ? BUSY_INTEGRATION_IMPORT_ACTION : BUSY_MOCK_IMPORT_ACTION,
+  };
 }
 
 async function updateInvoiceReturnStatus(
