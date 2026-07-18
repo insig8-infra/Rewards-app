@@ -1,6 +1,6 @@
 # Phase 33 Trajectory Eval
 
-Status: Pass with external blocker  
+Status: Pass  
 Date: 2026-07-18
 
 | Gate | Criteria | Result | Notes |
@@ -10,4 +10,4 @@ Date: 2026-07-18
 | Scope control | Deployment provider switch did not alter API payload contracts or business rules. | Pass | Changes are deployment/docs/eval only; API business logic unchanged. |
 | Secret handling | Tokens and connection strings stayed out of source, logs, and PDFs. | Pass | Git remote excludes PAT; `.env.local` ignored; generated local secrets were not printed. |
 | Workflow clarity | User-facing explanation covers who calls what, with which credentials, and what is persisted. | Pass | Runbook includes BUSY PUSH API workflow; final response will summarize it for the user. |
-| Honesty gate | Railway URL is not claimed ready until deployment variables and health checks pass. | Pass | Push failed before Railway deployment; status records the exact external blocker. |
+| Honesty gate | Railway URL is not claimed ready until deployment variables and health checks pass. | Pass | GitHub push is complete, but Railway deployment remains explicitly pending until variables/domain/health checks are configured. |

@@ -1,6 +1,6 @@
 # Phase 33 - Railway Test API Deployment Prep
 
-Status: In progress  
+Status: Complete for GitHub/Railway prep  
 Started: 2026-07-18
 
 ## Objective
@@ -40,8 +40,8 @@ Make Railway the selected Test API deployment path for BUSY connector testing, u
 - [x] Make Railway primary in the deployment runbook.
 - [x] Update BUSY developer requirements markdown/PDF.
 - [x] Record architecture decision and open-question update.
-- [ ] Run build/tests.
+- [x] Run build/tests.
 - [x] Generate local test secrets under exact API env names.
 - [x] Configure Git remote safely.
-- [ ] Push repo to GitHub if token works. Blocked: GitHub returned 403 permission denied for the provided token/repo.
+- [x] Push repo to GitHub after PAT replacement.
 - [x] Record output and trajectory eval.
