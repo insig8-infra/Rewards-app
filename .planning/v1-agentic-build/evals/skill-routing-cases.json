@@ -1,0 +1,101 @@
+{
+  "version": "0.1.0",
+  "cases": [
+    {
+      "case_id": "qr_positive_reprint",
+      "input": "Implement reprinting so the old QR token becomes invalid and a replacement token is issued.",
+      "expected_skill": "qr-lifecycle",
+      "expected_outcome": "Use QR lifecycle state rules and require tests for old-token rejection."
+    },
+    {
+      "case_id": "qr_negative_reward_catalog",
+      "input": "Design the reward catalog card for an Air Fryer prize.",
+      "expected_skill": "ui-surface-implementation",
+      "not_expected_skill": "qr-lifecycle"
+    },
+    {
+      "case_id": "ui_positive_visible_upload_control",
+      "input": "The Browse button for contractor photo upload looks present but does not open the file picker when I click it.",
+      "expected_skill": "ui-surface-implementation",
+      "expected_outcome": "Run Browser UAT against the exact URL, click the visible Browse control, verify file chooser behavior, inspect console/network errors, and confirm persisted readback after upload."
+    },
+    {
+      "case_id": "ui_positive_browser_runtime_parity",
+      "input": "The admin web page works in tests but not at http://127.0.0.1:3001 for the workflow I am using.",
+      "expected_skill": "ui-surface-implementation",
+      "expected_outcome": "Verify exact URL parity, hydration, client chunk loading, CORS/fetch behavior, and visible-control workflow evidence."
+    },
+    {
+      "case_id": "reward_positive_cancel_before_collection",
+      "input": "Add support for contractors canceling a redeemed reward before collecting it at the shop.",
+      "expected_skill": "reward-ledger",
+      "expected_outcome": "Restore points, recalculate eligibility, and write Balance Book entries."
+    },
+    {
+      "case_id": "permission_positive_staff_export_denied",
+      "input": "Verify STAFF cannot export QR printed reports but OWNER can share them as Excel.",
+      "expected_skill": "role-permissions",
+      "expected_outcome": "Server-side deny test for STAFF export and allow test for OWNER."
+    },
+    {
+      "case_id": "busy_positive_partial_return",
+      "input": "Map BUSY partial sale return data so later printing of Not Printed units is blocked for returned quantity.",
+      "expected_skill": "busy-integration",
+      "expected_outcome": "Use mock adapter until real fields are provided and test partial return behavior."
+    },
+    {
+      "case_id": "security_positive_phase_gate",
+      "input": "Before finishing the QR scan phase, check that tests, authorization, audit logging, and secret scanning are covered.",
+      "expected_skill": "security-eval-gate",
+      "expected_outcome": "Run completion checklist and report residual risk."
+    },
+    {
+      "case_id": "frontend_positive_polish_review",
+      "input": "The admin dashboard works but looks generic and not like a thoughtfully designed 2026 application.",
+      "expected_skill": "frontend-experience-quality",
+      "expected_outcome": "Review against the frontend experience standard, reference inputs, visual hierarchy, control placement, state design, and desktop/mobile screenshots."
+    },
+    {
+      "case_id": "frontend_positive_mobile_shell_before_backend_expansion",
+      "input": "Before adding more mobile backend APIs, create a way to validate Contractor and Team Member auth, site selection, scan, and history screens.",
+      "expected_skill": "frontend-experience-quality",
+      "expected_outcome": "Require a mobile experience contract and thin client shell so backend behavior can be validated through visible user journeys."
+    },
+    {
+      "case_id": "questions_positive_rewards_slice",
+      "input": "Start building rewards redemption and Balance Book.",
+      "expected_skill": "phase-question-governance",
+      "expected_outcome": "Bring forward reward catalog, tier, point availability, reward status, cancellation, negative balance, calculation base, and rounding questions before implementation."
+    },
+    {
+      "case_id": "questions_positive_busy_return_slice",
+      "input": "Implement BUSY partial return handling.",
+      "expected_skill": "phase-question-governance",
+      "expected_outcome": "Bring forward BUSY partial/full return samples, line matching, discount, GST, item master, and event push questions before implementation."
+    },
+    {
+      "case_id": "frontend_positive_payments_style_mobile",
+      "input": "Build the first end-user mobile shell using PayTM and PhonePe style design elements, with colors that can change later.",
+      "expected_skill": "frontend-experience-quality",
+      "expected_outcome": "Use Indian payments-app UX patterns as inspiration only, define Volt Rewards theme tokens, avoid copied branding/assets, and verify polished mobile screens."
+    },
+    {
+      "case_id": "ui_positive_hindi_english_day_one",
+      "input": "The mobile app should have Hindi and English toggle from day one.",
+      "expected_skill": "ui-surface-implementation",
+      "expected_outcome": "Add localization structure, visible language toggle, translated screen copy, and layout checks for both languages."
+    },
+    {
+      "case_id": "permission_positive_scan_history_scope",
+      "input": "Contractor should see all scan history but Team Member should only see scan history for sites they scanned or attempted.",
+      "expected_skill": "role-permissions",
+      "expected_outcome": "Enforce scan-history visibility server-side and verify Contractor full history versus Team Member restricted history."
+    },
+    {
+      "case_id": "ui_positive_team_member_recent_clearable",
+      "input": "Team Member login should show only one recent contractor after successful login and allow clearing it.",
+      "expected_skill": "ui-surface-implementation",
+      "expected_outcome": "Store one secure local recent contractor only after OTP success, render a clear/remove control, and keep OTP mandatory."
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+
+----------------------------------------
+#Difference between VchType, VchNo, tmpVchCode? 
+VchTYpe represents sale,purchase,payment,receipt etc.
+VchNo represents billing invoice number.
+tmpVchCode  represents a invoice ID which can not changed.
+
+#Which field defines a Unique Invoice ID that remains unchanged even if the invoice is updated?
+tmpVchCode
+#Which Fields gives us product details in the invoice - Product Name, Product Quantity, Product Price, Product Unit? 
+ItemEntries tag represents for item entries. ItemEntries is like collection of itemDetails. under itemdetails you will find these details.
+#Can BUSY provide one sample each for partial return, full return, and cancellation?
+Busy return Same xml format with defferent VchType and cancellation flag.
+
+
+
+#Difference between VchType, VchNo, tmpVchCode? 
+VchTYpe represents sale,purchase,payment,receipt etc.
+VchNo represents billing invoice number.
+tmpVchCode  represents a invoice ID which can not changed.
+
+#Which field defines a Unique Invoice ID that remains unchanged even if the invoice is updated?
+tmpVchCode
+#Which Fields gives us product details in the invoice - Product Name, Product Quantity, Product Price, Product Unit? 
+ItemEntries tag represents for item entries. ItemEntries is like collection of itemDetails. under itemdetails you will find these details.
+#Can BUSY provide one sample each for partial return, full return, and cancellation?
+Busy return Same xml format with defferent VchType and cancellation flag.
+
+---------------------------------------
+
+Follow up questions for Mohit : 
+
+1. what is the field used as cancellation flag? Is is checked for Product Partial return and full return both? Can you share example of how it looks like?
+As long as our API calls are able to identify  Partial return and full return / cancellation for every tmpVchCode we should be good. 
+
+-- Return Invoice has a linkage to Original Invoice on Voucher level. 
+
+2. A. Is tmpItemCode a unique code for each type of item. For example - 40291 is for Wires etc. 40292 for fans and so on? 
+   B. Can you provide a full list of codes?  How frequently a new tmpItemCode is added to the Database? We need a way to know whenever a new tmpItemCode is introduced. 
+
+-- Get the existing list from Shishir. 
+-- API requirement - whenever a new tmpItemCode is introduced it somehow let's us know. 
+
+3. A. What is the item level field for discount on that item. Since we would want to calcualte reward points on discounted price of the item. 
+   B. Is CompoundDiscount an absoulte value (like 5, 10 , 15 rupees) OR percentage (like 0.01, 0.02) etc.?
+
+----- skip ----
+
+
+4. Fields required from API calls
+For every 'VchType' belonging to Sale, Full Return, and Partial Return :
+'date','tmpVchCode', 'PartyName' (i.e. Customer Name)
+
+Item 1 : 'Sr.No','ItemName', 'tmpItemCode','Price', 'Qty', 'CompoundDiscount', 'cancellation_flag_status'
+Item 2 : 'Sr.No','ItemName','tmpItemCode','Price', 'Qty', 'CompoundDiscount', 'cancellation_flag_status'
+and so on...
+
+When a certain tmpVchCode gets partially or fully returned - that should trigger a push to our backend notifying of the alert with the changes. That will check if the QR code status on the changed ITEM is SCANNED, if yes, those points from that contractor account will be reversed. 
+
+Note: If a Invoice is generated on 30/06/2026 and later updated on 5/07/2026 (partial return) need fields that preserve both dates - Date of Sale and Date of updation. 
+
+
+
+6. How does return XML references the original sale tmpVchCode? Whats that field? 
+
+-------------------------------------------------------------------------------------
+
+For Shishir and Pratik's consideration: 
+
+Business Decision on LoyaltyReward calculation - Do we want it to be based on TYPE of ITEM and its PRICE (i.e 1% of the item price for fans, 2 % for wires etc.) OR Just the PRICE (i.e. be it fans or wires or anything , if the price of the item is between 100 to 500 it will 1%, if price is between 500 to 1000 then loyalty rewards will be 2%)? 
+My below logic is using BOTH ITEM TYPE AND PRICE. But lets discuss this on our next call or give me your go ahead if below logic is in line with how you want it to be. 
+
+
+if Price > 100 AND tmpItemCode = 40291 THEN LoyaltyReward = 0.01*[Price-(Price*Discount)] >> Print QR codes == Qty with text ('Get Rs.' LoyaltyReward 'on scan')
+if Price > 100 AND tmpItemCode = 40292 THEN LoyaltyReward = 0.02*[Price-(Price*Discount)] >> Print QR codes == Qty with text ('Get Rs.' LoyaltyReward 'on scan')
+
+
+-------------------------------------------------------------------------------------

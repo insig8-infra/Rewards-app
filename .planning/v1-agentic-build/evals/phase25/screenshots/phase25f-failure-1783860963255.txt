@@ -1,0 +1,28 @@
+Read only
+Contractors
+View contractor status
+0
+Active
+0
+Inactive
+0
+Sites
+0
+Scans
+Read-only contractor directory
+STAFF can review contractor status and sites but cannot register, edit, reset MPIN, or deactivate accounts.
+Directory
+No contractors loaded
+Loading contractors
+D
+D
+Dash
+QR
+QR
+Return
+C
+C
+Contract
+R
+R
+Rewards

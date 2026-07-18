@@ -1,0 +1,232 @@
+{
+  "screenshots": [
+    "screenshots/phase27-mobile-login-reveal-360x740.png",
+    "screenshots/phase27-mobile-login-reveal-390x844.png",
+    "screenshots/phase27-mobile-login-reveal-430x932.png",
+    "screenshots/phase27-mobile-login-reveal-480x900.png",
+    "screenshots/phase27-mobile-login-hindi-360x740.png",
+    "screenshots/phase27-mobile-login-hindi-390x844.png",
+    "screenshots/phase27-mobile-login-hindi-430x932.png",
+    "screenshots/phase27-mobile-login-hindi-480x900.png",
+    "screenshots/phase27-mobile-dashboard-promotions-360x740.png",
+    "screenshots/phase27-mobile-dashboard-promotions-390x844.png",
+    "screenshots/phase27-mobile-dashboard-promotions-430x932.png",
+    "screenshots/phase27-mobile-dashboard-promotions-480x900.png",
+    "screenshots/phase27-mobile-rewards-360x740.png",
+    "screenshots/phase27-mobile-rewards-390x844.png",
+    "screenshots/phase27-mobile-rewards-430x932.png",
+    "screenshots/phase27-mobile-rewards-480x900.png",
+    "screenshots/phase27-mobile-balance-book-360x740.png",
+    "screenshots/phase27-mobile-balance-book-390x844.png",
+    "screenshots/phase27-mobile-balance-book-430x932.png",
+    "screenshots/phase27-mobile-balance-book-480x900.png",
+    "screenshots/phase27-mobile-profile-360x740.png",
+    "screenshots/phase27-mobile-profile-390x844.png",
+    "screenshots/phase27-mobile-profile-430x932.png",
+    "screenshots/phase27-mobile-profile-480x900.png",
+    "screenshots/phase27-mobile-team-recent-contractor-360x740.png",
+    "screenshots/phase27-mobile-team-recent-contractor-390x844.png",
+    "screenshots/phase27-mobile-team-recent-contractor-430x932.png",
+    "screenshots/phase27-mobile-team-recent-contractor-480x900.png",
+    "screenshots/phase27-admin-login-reveal-360x740.png",
+    "screenshots/phase27-admin-login-reveal-390x844.png",
+    "screenshots/phase27-admin-login-reveal-430x932.png",
+    "screenshots/phase27-admin-login-reveal-480x900.png",
+    "screenshots/phase27-admin-owner-rewards-claims-360x740.png",
+    "screenshots/phase27-admin-owner-rewards-claims-390x844.png",
+    "screenshots/phase27-admin-owner-rewards-claims-430x932.png",
+    "screenshots/phase27-admin-owner-rewards-claims-480x900.png",
+    "screenshots/phase27-admin-owner-rewards-catalog-360x740.png",
+    "screenshots/phase27-admin-owner-rewards-catalog-390x844.png",
+    "screenshots/phase27-admin-owner-rewards-catalog-430x932.png",
+    "screenshots/phase27-admin-owner-rewards-catalog-480x900.png",
+    "screenshots/phase27-admin-staff-rewards-readonly-360x740.png",
+    "screenshots/phase27-admin-staff-rewards-readonly-390x844.png",
+    "screenshots/phase27-admin-staff-rewards-readonly-430x932.png",
+    "screenshots/phase27-admin-staff-rewards-readonly-480x900.png"
+  ],
+  "assertions": [
+    {
+      "name": "end-user login shell",
+      "status": "PASS",
+      "detail": "Volt Rewards | Contractor | Team Member | Mobile number | 4-digit MPIN | EN"
+    },
+    {
+      "name": "contractor MPIN hidden before reveal",
+      "status": "PASS",
+      "detail": "Absent: 1234"
+    },
+    {
+      "name": "end-user Hindi language toggle",
+      "status": "PASS",
+      "detail": "Visible login copy switched to Devanagari text."
+    },
+    {
+      "name": "dashboard promotion banner",
+      "status": "PASS",
+      "detail": "NEW SALE IS ON! | Earn extra rewards on Havells wires, Wipro bulbs, and Atomberg fans this week."
+    },
+    {
+      "name": "contractor dashboard reward shell",
+      "status": "PASS",
+      "detail": "Points available | Featured Rewards | Balance Book | Scan QR"
+    },
+    {
+      "name": "contractor rewards overview",
+      "status": "PASS",
+      "detail": "Rewards | Available rewards | Balance Book | Lifetime collected | Tier"
+    },
+    {
+      "name": "contractor rewards list data",
+      "status": "PASS",
+      "detail": "Phase 27 Proof Reward 41916270"
+    },
+    {
+      "name": "contractor balance book controls",
+      "status": "PASS",
+      "detail": "Balance Book | Search Balance Book | Filter | Sort | Credits | Reward claims"
+    },
+    {
+      "name": "contractor balance book backend row",
+      "status": "PASS",
+      "detail": "3208"
+    },
+    {
+      "name": "contractor profile controls",
+      "status": "PASS",
+      "detail": "Profile | Profile photo | Use a PNG or JPEG under 2 MB. | Change MPIN | Old MPIN | New MPIN"
+    },
+    {
+      "name": "profile photo file input",
+      "status": "PASS",
+      "detail": "image/png,image/jpeg"
+    },
+    {
+      "name": "team member recent contractor storage",
+      "status": "PASS",
+      "detail": "Ramesh Sharma | 9000001001"
+    },
+    {
+      "name": "team member recent contractor visible",
+      "status": "PASS",
+      "detail": "Recent contractor | Ramesh Sharma | 9000001001 | Use recent | Clear"
+    },
+    {
+      "name": "team member recent contractor clear",
+      "status": "PASS",
+      "detail": "UI card and local storage cleared."
+    },
+    {
+      "name": "admin login shell",
+      "status": "PASS",
+      "detail": "Volt Admin | OWNER | STAFF | Mobile number | PIN | Sign in"
+    },
+    {
+      "name": "aria button Show PIN",
+      "status": "PASS",
+      "detail": "Button found."
+    },
+    {
+      "name": "owner rewards sections",
+      "status": "PASS",
+      "detail": "Rewards | Claim Desk | History | Catalog"
+    },
+    {
+      "name": "owner reward fulfillment controls",
+      "status": "PASS",
+      "detail": "CLM-C87F6F | Send OTP | Mark Delivered | Backend re-checks active Claim Raised"
+    },
+    {
+      "name": "owner reward catalog controls",
+      "status": "PASS",
+      "detail": "Catalog Management | Reward code | Reward name | Save reward | Upload image | Catalog"
+    },
+    {
+      "name": "staff reward history visible",
+      "status": "PASS",
+      "detail": "Rewards | STAFF history | Reward History"
+    },
+    {
+      "name": "staff rewards mutation controls hidden",
+      "status": "PASS",
+      "detail": "Absent: Claim Desk, Catalog Management, Send OTP, Mark Delivered, Save reward, Upload image"
+    },
+    {
+      "name": "runtime console",
+      "status": "PASS",
+      "detail": "No console errors or runtime exceptions captured."
+    }
+  ],
+  "consoleErrors": [],
+  "runtimeExceptions": [],
+  "api": {
+    "contractor": "Ramesh Sharma",
+    "contractorMobile": "9000001001",
+    "promotions": [
+      "NEW SALE IS ON!"
+    ],
+    "proofReward": {
+      "code": "P27-41817780",
+      "name": "Phase 27 Proof Reward 41817780",
+      "status": "ACTIVE"
+    },
+    "rewardCount": 11,
+    "rewardStatuses": [
+      {
+        "name": "Phase 27 Proof Reward 41817780",
+        "status": "CHOSEN",
+        "claimId": "CLM-C87F6F"
+      },
+      {
+        "name": "Phase 27 Proof Reward 41916270",
+        "status": "ELIGIBLE"
+      },
+      {
+        "name": "Phase 27 Proof Reward 42010176",
+        "status": "CHOSEN",
+        "claimId": "CLM-A8F663"
+      },
+      {
+        "name": "Premium Toolbox",
+        "status": "FULFILLED",
+        "claimId": "CLM-3F8632"
+      },
+      {
+        "name": "Wire Stripper Kit",
+        "status": "FULFILLED",
+        "claimId": "CLM-1AFE4D"
+      },
+      {
+        "name": "Air Fryer",
+        "status": "FULFILLED",
+        "claimId": "CLM-28B170"
+      },
+      {
+        "name": "Cordless Drill Kit",
+        "status": "LOCKED"
+      },
+      {
+        "name": "Ambrane 20000mAh Powerbank",
+        "status": "LOCKED"
+      },
+      {
+        "name": "Cordless Drill Kit",
+        "status": "LOCKED"
+      },
+      {
+        "name": "Bose Headphones",
+        "status": "LOCKED"
+      },
+      {
+        "name": "Smart TV",
+        "status": "LOCKED"
+      }
+    ],
+    "balanceBookEntries": 48,
+    "ensuredClaimId": "CLM-C87F6F",
+    "adminOwnerClaims": 2,
+    "adminOwnerHistory": 11,
+    "adminOwnerCatalog": 16,
+    "adminStaffHistory": 11
+  }
+}

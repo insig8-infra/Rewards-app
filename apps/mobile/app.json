@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Volt Rewards",
+    "slug": "volt-rewards",
+    "scheme": "voltrewards",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.insig8.voltrewards",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Volt Rewards uses the camera to scan product QR codes when you choose Scan QR.",
+        "NSContactsUsageDescription": "Volt Rewards can help select a contractor mobile number from contacts if you allow it."
+      }
+    },
+    "android": {
+      "package": "com.insig8.voltrewards",
+      "permissions": [],
+      "adaptiveIcon": {
+        "backgroundColor": "#0757D7"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-secure-store"],
+    "extra": {
+      "apiBaseUrl": "http://127.0.0.1:3000/api"
+    }
+  }
+}

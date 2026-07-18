@@ -1,0 +1,26 @@
+- generic [ref=e4] [box=0,0,780,1688]:
+  - generic [ref=e5] [box=0,0,780,95]:
+    - generic [ref=e6] [box=24,24,204,55]:
+      - generic [ref=e7] [box=24,24,204,33]: Volt Rewards
+      - generic [ref=e8] [box=24,61,204,18]: Scan, earn, and track rewards
+    - button "हिंदी" [ref=e9] [cursor=pointer] [box=707,33,49,37]:
+      - generic [ref=e10] [box=719,41,25,21]: हिंदी
+  - generic [ref=e12] [box=0,95,780,580]:
+    - generic [ref=e13] [box=16,111,748,49]:
+      - button "Contractor" [ref=e14] [cursor=pointer] [box=20,115,370,41]:
+        - generic [ref=e15] [box=167,127,77,17]: Contractor
+      - button "Team Member" [ref=e16] [cursor=pointer] [box=390,115,370,41]:
+        - generic [ref=e17] [box=525,127,99,17]: Team Member
+    - generic [ref=e18] [box=16,176,748,326]:
+      - generic [ref=e19] [box=33,193,714,23]: Contractor
+      - generic [ref=e20] [box=33,228,714,67]:
+        - generic [ref=e21] [box=33,228,714,15]: Mobile number
+        - textbox "Mobile number" [ref=e22] [box=33,247,714,48]
+      - generic [ref=e23] [box=33,307,714,67]:
+        - generic [ref=e24] [box=33,307,714,15]: 4-digit MPIN
+        - textbox "4-digit MPIN" [ref=e25] [box=33,326,714,48]
+      - button "Login" [ref=e26] [cursor=pointer] [box=33,394,714,50]:
+        - generic [ref=e27] [box=369,410,42,18]: Login
+      - button "Forgot MPIN?" [ref=e28] [cursor=pointer] [box=33,444,714,41]:
+        - generic [ref=e29] [box=33,456,714,17]: Forgot MPIN?
+    - generic [ref=e31] [box=28,530,724,21]: Camera and contacts are used only when you choose those actions.

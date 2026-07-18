@@ -1,0 +1,93 @@
+- [ ] End-user app working name is "Volt Rewards" and is  available on Android and iOS.
+- [ ] Admin app is available on Android and iOS.
+- [ ] Android and iOS mobile apps are built using a cross-platform app stack.
+- [ ] Admin web portal is available in browser.
+- [ ] Android and iOS apps support public Play Store and App Store launch.
+- [ ] Contractor profiles are created/registered by the client/admin only; contractors cannot self-register.
+- [ ] Login screen allows user to choose `Contractor` or `Team Member`.
+- [ ] Contractor login verifies that the contractor exists in the system.
+- [ ] Contractor login uses Registered Mobile Number and a 4-digit MPIN (Temporary One-time MPIN sent with welcome message). On first login - SET MPIN appears and Contractor sets their own 4-digit MPIN.
+- Allow contractor to change their MPIN from their user profile as well - by entering old MPIN, New MPIN, Confirm New MPIN. 
+- [ ] Contractor login includes Forgot MPIN flow that simply asks them to call the contractor to get the current MPIN.
+- [ ] If a contractor record is not found, the app tells them to contact the retailer for onboarding.
+- [ ] Team Member login does not show the full contractor list.
+- [ ] Team Member enters the registered mobile number of the contractor they are currently helping. (allow them to select it from their phones contacts)
+- [ ] If the mobile number belongs to a contractor registered with the retailer, OTP is sent to that contractor.
+- [ ] Team Member receives the OTP offline from that contractor and enters it in the app.
+- [ ] If the mobile number is not registered, Team Member is shown a neutral not-found state and cannot proceed.
+- [ ] Team Member login shows a Recent list with no more than one contractor.
+- [ ] Recent list is populated only after the Team Member has successfully logged in at least once for that registered contractor.
+- [ ] Team Member Recent contractor is stored locally on the Team Member's device as convenience-only state.
+- [ ] Team Member Recent contractor must be stored using secure device storage, not unprotected plain local storage.
+- [ ] Team Member Recent contractor must never replace OTP verification; OTP is required for every Team Member login/session.
+- [ ] Team Member can remove/change the Recent contractor.
+- [ ] Team Member login is restricted to QR scanning only (i.e. site selection, actual scanning of QR and Scan History).
+- [ ] Team Member sessions reset every day.
+- [ ] Contractor login exposes the full end-user app.
+- [ ] End-user app (Both Contractor and Team Member Personas) supports easy switching between Hindi and English for every screen or page.
+- [ ] Contractor app uses bottom navigation: Home, Scan, Scan History, Rewards.
+- [ ] Contractor home page shows Profile Pic at top right - which takes them to their profile, about, logout areas., "Your Sites", "Scan QR", Current tier (Silver/Gold etc.), total points accumulated till date, Points Available, top rewards up for claim or soon to expire claims or soon to reach rewards, and reward claim action. 
+- "Your Sites" will have options to Create New Site, Manage sites
+- Create Site enables the contractor to create a new project/site they are working on - "Client Name, Flat / Apartment No., Building Name, Area , City".  "Manage Sites" option - to remove, edit the site details. 
+- On Scan QR - Tiles of all active sites under that contractor show up - first select the site then scan the QR code inside it. You continue to scan for that site within it. Switch to a different site to scan QR on products meant for that site.
+- [ ] Team Member screen shows the contractor name, contractor number, contractor photo, and Scan QR only.On Scan QR - Tiles of all active sites under that contractor show up - first select the site then scan the QR code inside it. You continue to scan for that site within it. Switch to a different site to scan QR on products meant for that site.Team member cannot create / edit / delete any site. 
+- [ ] End-user app includes standard advertisement/banner placements for offers and promotions from the client.
+- [ ] Advertisement/banner placements are shown to both Contractor and Team Member personas.
+- [ ] Contractor persona includes basic app pages when they click on their photo in top right - such as My Profile, About, and Logout and "Help & Support - which shows them FAQs and contact Retailer phone number".
+- Scan History is basically entire History of QR Scans (Nothing related to Redemption of rewards only related to scan done for collecting the points). It should show line a timeline of all scans - successful scans, unsuccessful scans - reason for failure , If scanned (i.e. colleced) but unredeemed points were reversed due to product return, QR code ID , who was scanning - team-member or contractor , if team-member then their mobile number. It should have a filter for looking only at different types of scans. Maintaining Error attempts along with type of error is important for future issue solving. 
+-Rewards section is everything related to Rewards - on click - it should take Contractor to a page that shows "Balance Book" - everything Activity related to Rewards in chronological order - how many points redeemend, on which reward those points were redeemend, date, time, if any already redeemend points were reversed, stage of reversal - pre-collecting the reward (points redeemed but reward not physically collected yet) or post-collecting the reward - reward returned to retailer, what was the points balance after every such activity. It should have appropriate date and type filters. Next to Balance Book will be "Redeem" option - that shows full catelogue of available rewards - which one are eligible for redeemption, what rewards are close to being eligible for redeemption. Every product in catelogue has "Redeem" button which opens up a product information page with "Redeem Now" button which is active/ clickable only if contractor has enough points collected, else it remains greyed out with a message on the lines of  "Collect 2000 more points to Get this". 
+- Every Reward that is redeemed shows a symbol on the product tile in catelogue that indicates it is redeemed along with Claim ID. note that the contractor has simply chosen the reward here and not yet collected from the retailer. Once they collect it from the retailer , it should show a status of "Delivered / Collected". So in between Chosing a reward and actually collecting it - they can change their mind and cancel it and go for a different reward available. In this case , app should be able to reverse the deducted points, show available rewards according to collected points, tier adjusted accordingly, and Balance Book show reflect this as well. 
+ 
+- [ ] Admin web portal working name is "Volt Admin Web Portal" and supports contractor registration and un-registration.
+- [ ] Admin web portal shows contractor  details, rewards collected/given, analytics, and reports.
+- [ ] Admin web portal landing/front page shows `Print QR codes`.
+- [ ] Admin web portal pulls invoice details from the client database/BUSY integration after invoice generation.
+- [ ] Until actual BUSY API integration is available, the mock BUSY adapter uses realistic electric-shop invoices with invoice number, date, time, seller/customer GST details, taxable totals, GST totals, final total, and product line items such as Havells Wire, Atomberg Fans, Wipro Bulbs, switches, MCBs, and related electrical goods.
+- [ ] Admin web portal includes the QR print workflow: view invoice details, see pre-checked line items, check/uncheck products, reduce quantity if needed, issue print command, and view print history.
+- [ ] Admin web portal does not allow QR print quantity to exceed the invoiced quantity.
+- [ ] Admin web portal supports all non-camera OWNER and STAFF admin workflows available in the Admin Mobile app, including dashboards, contractor management, staff management, reward fulfillment, reports/exports, promotions, analytics, and admin management screens.
+- [ ] Admin web portal does not support returned-product QR status scan, cancel, or reverse flows in v1 because those flows require mobile camera scanning of the returned product QR and label-removed/discarded confirmation at the product handling point.
+- [ ] System tracks QR printing at individual QR/unit level, even when invoice data is displayed as line items with quantities.
+- [ ] System records selected/printed individual units as `Printed` and skipped/unprinted individual units as `Not Printed`.
+- [ ] Admin web portal can later print `Not Printed` units in one or more partial batches after checking through API that the product/invoice line item has not been returned.
+- [ ] Admin web portal tracks QR status: Printed/Unclaimed, Scanned/Claimed, Expired, Cancelled, Reprinted, and Reversed.
+- [ ] Reprinting a QR generates a replacement QR token and invalidates the old QR token.
+
+- [ ] Admin mobile app working name is `Volt Admin`.
+- [ ] Admin mobile apps include OWNER and STAFF personas and Login screen allows user to choose `OWNER` or `STAFF`.
+- [ ] OWNER is the store owner/master admin account created from backend.
+- [ ] OWNER logs in with registered mobile number and fixed 4-digit PIN.
+- [ ] OWNER can add staff members from admin mobile.
+- [ ] STAFF logs in with mobile number and assigned app-generated 4-digit PIN.
+- [ ] OWNER and STAFF sessions persist unless access is removed/deactivated, PIN changes, or the app is not opened for 4 straight days.
+- [ ] Admin mobile bottom navigation for OWNER persona is Dashboard, Return Scan, Contractors, Reports.
+- [ ] Admin mobile bottom navigation for STAFF persona is Dashboard (limited view and options), Return Scan, Contractors(view only).Staff Dashboard has Recent Activity” to show only Reverse / cancellation history with Who did, at what time. 
+
+- Owner persona Dashboard has OWNER profile (top right), total contactors onboarded, QR codes scan catgory bar chart - Printed , Scanned (collected), cancelled, reversed - with date filter (TOday, this week, last week, this month, custom date range), staff management, and reward fulfillment, Recent Activity. 
+-Return-Scan include a return-processing QR scan flow.
+- [ ] BOTH OWNER AND STAFF personas can scan a returned product QR code and show its current status.
+- "cancel" a QR code IF it is not yet Scanned (i.e. points not collected AND QR id non-expired). 
+- During return processing , a check box must be checked by OWNER or STAFF confirming that the QR label is removed from the product and discarded as a successful last step in cancelling a QR code
+- [ ] BOTH OWNER AND STAFF personas can "reverse" points for an already collected/scanned Scanned/Claimed QR code during return processing, then discard that QR.
+- [ ] Cancel and reverse actions use `Product Returned` as the fixed reason; no proof upload is required.
+- [ ] Cancel and reverse actions require a confirmation checkbox that the QR label was removed and discarded.
+- [ ] Reverse confirmation warns if reversal may create a negative contractor balance.
+- [ ] If returned QR points were claimed but not fulfilled, system unclaims/revokes the claim.
+- [ ] If returned QR points were already fulfilled, system reverses the points and may create a negative contractor balance. 
+
+- [ ] QR expiry is 45 days for now, configurable later if business rule changes.
+- [ ] Under COntractor option - Contractor leaderboard and options to add new contractor - OWNER can register contractors from admin mobile with contractor name, mobile number, and optional photo. 
+- [ ] ContractorID is auto-generated during admin mobile contractor registration.
+- [ ] Contractor registration sends a welcome SMS along with a one-time temporary PIN and a frontend app download links.
+- [ ] Duplicate contractor mobile number is blocked and shows existing contractor details.
+- [ ] OWNER can edit contractor name/photo/mobile and deactivate/unregister contractors from admin mobile.
+- [ ] STAFF can view contractor list/details but cannot add, edit, deactivate, unregister, delete profiles, manually change points, manage staff, or export/share reports.
+- [ ] Only OWNER can fulfill rewards by entering Claim ID, verifying claim, sending OTP to registered contractor mobile number, entering OTP, and marking the claim as `Fulfilled`.
+
+- [ ] Reports give all types of report OWNER may need to see all kinds of information related to this platform.
+
+- [ ] Reports includes QR codes printed by day/week/last week/month/3-month/custom date range with product category and quantity. It also includes contractor leaderboard by collected points, QR status, reward claims, returns/reversals, product/category performance, and deep-dive analytics for each contractor.
+- [ ] STAFF reports are view-only.
+- [ ] OWNER can export/share reports as PDF, Excel, and WhatsApp.
+- [ ] Admin mobile notifications/alerts are not needed for v1.
+- [ ] Admin web portal is the primary browser surface for QR printing and all non-camera OWNER/STAFF management workflows; returned-product QR scan/status/cancel/reverse remains Admin Mobile only for v1.

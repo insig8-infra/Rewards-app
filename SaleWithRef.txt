@@ -1,0 +1,190 @@
+<Sale>
+    <VchSeriesName>Main</VchSeriesName>
+    <Date>07-02-2026</Date>
+    <VchType>9</VchType>
+    <StockUpdationDate>07-02-2026</StockUpdationDate>
+    <VchNo>12/2025-26</VchNo>
+    <AutoVchNo>12</AutoVchNo>
+    <STPTName>Local-Exempt</STPTName>
+    <MasterName1>Busy Infotech Pvt. Ltd.</MasterName1>
+    <MasterName2>Main Store</MasterName2>
+    <TranCurName>Rs.</TranCurName>
+    <OriginalID>Main;07-02-2026;12/2025-26;Sale</OriginalID>
+    <InputType>1</InputType>
+    <BillingDetails>
+        <PartyName>Busy Infotech Pvt. Ltd.</PartyName>
+        <tmpVchCode>25</tmpVchCode>
+        <tmpStateName>Delhi</tmpStateName>
+    </BillingDetails>
+    <VchOtherInfoDetails>
+        <OFInfo />
+        <PurchaseBillNo>12/2025-26</PurchaseBillNo>
+        <PurchaseBillDate>07-02-2026</PurchaseBillDate>
+    </VchOtherInfoDetails>
+    <ItemEntries>
+        <ItemDetail>
+            <Date>07-02-2026</Date>
+            <VchType>9</VchType>
+            <VchNo>12/2025-26</VchNo>
+            <SrNo>1</SrNo>
+            <ItemName>TestItem</ItemName>
+            <UnitName>Pcs.</UnitName>
+            <AltUnitName>Pcs.</AltUnitName>
+            <ConFactor>1</ConFactor>
+            <Qty>100</Qty>
+            <QtyMainUnit>100</QtyMainUnit>
+            <QtyAltUnit>100</QtyAltUnit>
+            <ItemTaxCategory>GST 12%</ItemTaxCategory>
+            <ItemDescInfo />
+            <Price>200</Price>
+            <PriceAltUnit>200</PriceAltUnit>
+            <ListPrice>200</ListPrice>
+            <Amt>20000</Amt>
+            <NettAmount>20000</NettAmount>
+            <CompoundDiscount>0.00</CompoundDiscount>
+            <tmpNettPrice>200</tmpNettPrice>
+            <tmpVchCode>25</tmpVchCode>
+            <tmpMainUCFactor>1</tmpMainUCFactor>
+            <MC>Main Store</MC>
+            <tmpDiscountBasis>1</tmpDiscountBasis>
+            <tmpGroupName>General</tmpGroupName>
+            <tmpMainUnitName>Pcs.</tmpMainUnitName>
+            <tmpAltUnitName>Pcs.</tmpAltUnitName>
+            <tmpConFactorType>1</tmpConFactorType>
+            <tmpItemMastConFactor>1</tmpItemMastConFactor>
+            <tmpPackingUnitName>Pcs.</tmpPackingUnitName>
+            <tmpItemMastPUConFactor>1</tmpItemMastPUConFactor>
+            <ItemSerialNoEntries />
+            <ParamStockEntries />
+            <BatchEntries />
+            <DiscountStructure>Simple Discount % of Amount</DiscountStructure>
+            <tmpNettPriceAfterDisc>200</tmpNettPriceAfterDisc>
+            <tmpItemCode>40291</tmpItemCode>
+            <tmpMCCode>201</tmpMCCode>
+            <tmpVchSeriesCode>258</tmpVchSeriesCode>
+            <tmpPartyCode>40109</tmpPartyCode>
+            <tmpMainUnitCode>40182</tmpMainUnitCode>
+            <tmpUnitCode>40182</tmpUnitCode>
+            <tmpSTPTCode>40218</tmpSTPTCode>
+            <RecType>2</RecType>
+        </ItemDetail>
+    </ItemEntries>
+    <AccEntries>
+        <AccDetail>
+            <Date>07-02-2026</Date>
+            <VchType>9</VchType>
+            <VchNo>12/2025-26</VchNo>
+            <SrNo>1</SrNo>
+            <AccountName>Busy Infotech Pvt. Ltd.</AccountName>
+            <AmountType>1</AmountType>
+            <AmtMainCur>-56000</AmtMainCur>
+            <tmpVchCode>25</tmpVchCode>
+            <tmpGroupName>Sundry Creditors</tmpGroupName>
+            <tmpAccCode>40109</tmpAccCode>
+            <BillRefs />
+        </AccDetail>
+        <AccDetail>
+            <Date>07-02-2026</Date>
+            <VchType>9</VchType>
+            <VchNo>12/2025-26</VchNo>
+            <SrNo>2</SrNo>
+            <AccountName>Sales</AccountName>
+            <AmountType>2</AmountType>
+            <AmtMainCur>56000</AmtMainCur>
+            <tmpVchCode>25</tmpVchCode>
+            <tmpGroupName>Sale</tmpGroupName>
+            <tmpAccCode>4</tmpAccCode>
+            <BillRefs />
+        </AccDetail>
+    </AccEntries>
+    <PendingBillDetails>
+        <BillDetail>
+            <MasterName1>Busy Infotech Pvt. Ltd.</MasterName1>
+            <tmpMasterCode1>40109</tmpMasterCode1>
+            <BillRefs>
+                <Method>1</Method>
+                <SrNo>1</SrNo>
+                <RefNo>12/2025-26</RefNo>
+                <Date>07-02-2026</Date>
+                <DueDate>07-02-2026</DueDate>
+                <Value1>-56000</Value1>
+                <VchType>9</VchType>
+                <MfgDate>07-02-2026</MfgDate>
+                <tmpRefCode>22</tmpRefCode>
+                <tmpRecType>1</tmpRecType>
+                <tmpVchCode>25</tmpVchCode>
+                <tmpMasterCode1>40109</tmpMasterCode1>
+            </BillRefs>
+        </BillDetail>
+    </PendingBillDetails>
+    <PendingOrders>
+        <OrderDetail>
+            <MasterName1>TestItem</MasterName1>
+            <MasterName2>Busy Infotech Pvt. Ltd.</MasterName2>
+            <tmpMasterCode1>40291</tmpMasterCode1>
+            <tmpMasterCode2>40109</tmpMasterCode2>
+            <OrderRefs>
+                <Method>2</Method>
+                <SrNo>1</SrNo>
+                <RefNo>1</RefNo>
+                <Date>07-02-2026</Date>
+                <DueDate>01-04-2025</DueDate>
+                <Value1>-100</Value1>
+                <Value2>-100</Value2>
+                <MainTranPrice>200</MainTranPrice>
+                <VchType>9</VchType>
+                <ItemSrNo>1</ItemSrNo>
+                <AltTranPrice>200</AltTranPrice>
+                <MfgDate>07-02-2026</MfgDate>
+                <tmpRefCode>20</tmpRefCode>
+                <tmpRecType>4</tmpRecType>
+                <tmpVchCode>25</tmpVchCode>
+                <tmpMasterCode1>40291</tmpMasterCode1>
+                <tmpMasterCode2>40109</tmpMasterCode2>
+            </OrderRefs>
+        </OrderDetail>
+        <OrderDetail>
+            <MasterName1>Item</MasterName1>
+            <MasterName2>Busy Infotech Pvt. Ltd.</MasterName2>
+            <tmpMasterCode1>40294</tmpMasterCode1>
+            <tmpMasterCode2>40109</tmpMasterCode2>
+            <OrderRefs>
+                <Method>2</Method>
+                <SrNo>1</SrNo>
+                <RefNo>1</RefNo>
+                <Date>07-02-2026</Date>
+                <DueDate>01-04-2025</DueDate>
+                <Value1>-120</Value1>
+                <Value2>-120</Value2>
+                <MainTranPrice>300</MainTranPrice>
+                <VchType>9</VchType>
+                <ItemSrNo>2</ItemSrNo>
+                <AltTranPrice>300</AltTranPrice>
+                <MfgDate>07-02-2026</MfgDate>
+                <tmpRefCode>21</tmpRefCode>
+                <tmpRecType>4</tmpRecType>
+                <tmpVchCode>25</tmpVchCode>
+                <tmpMasterCode1>40294</tmpMasterCode1>
+                <tmpMasterCode2>40109</tmpMasterCode2>
+            </OrderRefs>
+        </OrderDetail>
+    </PendingOrders>
+    <POSVchData>
+        <CarrySettlement>True</CarrySettlement>
+    </POSVchData>
+    <tmpVchCode>25</tmpVchCode>
+    <tmpVchSeriesCode>258</tmpVchSeriesCode>
+    <tmpMasterCode1>40109</tmpMasterCode1>
+    <tmpMasterCode2>201</tmpMasterCode2>
+    <tmpStPtCode>40218</tmpStPtCode>
+    <tmpTotalQty>220</tmpTotalQty>
+    <tmpTotalAltQty>220</tmpTotalAltQty>
+    <tmpTotalAmt>56000</tmpTotalAmt>
+    <tmpSalePurcAmt>56000</tmpSalePurcAmt>
+    <tmpCostOfGoods>56000</tmpCostOfGoods>
+    <OldIdentity>
+        9üMainü07-02-2026ü12/2025-26ü40109üü12/2025-26ü07-02-2026û9üMainü07-02-2026ü12/2025-26ü40109üü12/2025-26ü07-02-2026
+    </OldIdentity>
+    <tmpBillDateStr>07-02-2026</tmpBillDateStr>
+    <tmpBillNoStr>12/2025-26</tmpBillNoStr>
+</Sale>

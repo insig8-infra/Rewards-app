@@ -1,0 +1,93 @@
+{
+  "screenshots": [
+    "screenshots/phase25f-owner-contractors-registration-360x740.png",
+    "screenshots/phase25f-owner-contractors-registration-390x844.png",
+    "screenshots/phase25f-owner-contractors-registration-430x932.png",
+    "screenshots/phase25f-owner-contractors-registration-480x900.png",
+    "screenshots/phase25f-owner-contractor-detail-actions-360x740.png",
+    "screenshots/phase25f-owner-contractor-detail-actions-390x844.png",
+    "screenshots/phase25f-owner-contractor-detail-actions-430x932.png",
+    "screenshots/phase25f-owner-contractor-detail-actions-480x900.png",
+    "screenshots/phase25f-owner-reports-landing-360x740.png",
+    "screenshots/phase25f-owner-reports-landing-390x844.png",
+    "screenshots/phase25f-owner-reports-landing-430x932.png",
+    "screenshots/phase25f-owner-reports-landing-480x900.png",
+    "screenshots/phase25f-owner-report-preview-360x740.png",
+    "screenshots/phase25f-owner-report-preview-390x844.png",
+    "screenshots/phase25f-owner-report-preview-430x932.png",
+    "screenshots/phase25f-owner-report-preview-480x900.png",
+    "screenshots/phase25f-owner-staff-management-360x740.png",
+    "screenshots/phase25f-owner-staff-management-390x844.png",
+    "screenshots/phase25f-owner-staff-management-430x932.png",
+    "screenshots/phase25f-owner-staff-management-480x900.png",
+    "screenshots/phase25f-staff-contractor-readonly-360x740.png",
+    "screenshots/phase25f-staff-contractor-readonly-390x844.png",
+    "screenshots/phase25f-staff-contractor-readonly-430x932.png",
+    "screenshots/phase25f-staff-contractor-readonly-480x900.png"
+  ],
+  "assertions": [
+    {
+      "name": "owner contractor registration surface",
+      "status": "PASS",
+      "detail": "Register contractor | Directory | Upload photo"
+    },
+    {
+      "name": "owner contractor created in list",
+      "status": "PASS",
+      "detail": "Vijay Kulkarni | 9136877695 | points available"
+    },
+    {
+      "name": "contractor detail owner actions",
+      "status": "PASS",
+      "detail": "Owner actions | Upload contractor photo | Reset MPIN | Deactivate contractor"
+    },
+    {
+      "name": "contractor reset MPIN proof",
+      "status": "PASS",
+      "detail": "Temporary MPIN issued | MPIN | Expires"
+    },
+    {
+      "name": "owner live reports landing",
+      "status": "PASS",
+      "detail": "Report shortcuts | QR status | Contractor leaderboard"
+    },
+    {
+      "name": "owner report preview",
+      "status": "PASS",
+      "detail": "Preview | QR status"
+    },
+    {
+      "name": "owner staff management surface",
+      "status": "PASS",
+      "detail": "Add staff | Staff directory | Create staff"
+    },
+    {
+      "name": "owner staff created in list",
+      "status": "PASS",
+      "detail": "Temporary PIN issued | Priya Nair | Reset PIN | Deactivate"
+    },
+    {
+      "name": "staff contractor read-only list",
+      "status": "PASS",
+      "detail": "Read-only contractor directory | cannot register | Directory"
+    },
+    {
+      "name": "staff contractor detail read-only",
+      "status": "PASS",
+      "detail": "Read-only access | STAFF cannot edit"
+    },
+    {
+      "name": "runtime console",
+      "status": "PASS",
+      "detail": "No console errors or runtime exceptions captured."
+    }
+  ],
+  "consoleErrors": [],
+  "runtimeExceptions": [],
+  "api": {
+    "owner": "Shishir Mehta",
+    "staff": "Aarti Deshmukh",
+    "contractorName": "Vijay Kulkarni",
+    "staffName": "Priya Nair"
+  }
+}

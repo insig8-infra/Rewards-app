@@ -1,0 +1,24 @@
+V
+Volt Rewards
+EN
+|
+हिंदी
+LOGGED IN FOR CONTRACTOR
+Ramesh Sharma
+9000001001
+Logout
+SELECTED SITE AND SITE MANAGEMENT
+Select a site before scanning.
+You are scanning for this contractor. Choose the right site, scan product QR codes, and review your own scan activity.
+Scan QR
+No site available
+Ramesh Sharma has not created any active site yet. Ask the contractor to add a site before scanning QR codes.
+Select or change site
+No sites added yet.
+SCANNING FOR
+Ramesh Sharma
+Select a site before scanning.
+Ask the contractor to create a site first.
+Scan
+History
+Loading...

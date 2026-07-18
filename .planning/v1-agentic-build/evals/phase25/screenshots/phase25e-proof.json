@@ -1,0 +1,73 @@
+{
+  "screenshots": [
+    "screenshots/phase25e-contractor-dashboard-selected-360x740.png",
+    "screenshots/phase25e-contractor-dashboard-selected-390x844.png",
+    "screenshots/phase25e-contractor-dashboard-selected-430x932.png",
+    "screenshots/phase25e-contractor-dashboard-selected-480x900.png",
+    "screenshots/phase25e-contractor-scan-cart-360x740.png",
+    "screenshots/phase25e-contractor-scan-cart-390x844.png",
+    "screenshots/phase25e-contractor-scan-cart-430x932.png",
+    "screenshots/phase25e-contractor-scan-cart-480x900.png",
+    "screenshots/phase25e-contractor-cart-guard-360x740.png",
+    "screenshots/phase25e-contractor-cart-guard-390x844.png",
+    "screenshots/phase25e-contractor-cart-guard-430x932.png",
+    "screenshots/phase25e-contractor-cart-guard-480x900.png",
+    "screenshots/phase25e-contractor-commit-success-360x740.png",
+    "screenshots/phase25e-contractor-commit-success-390x844.png",
+    "screenshots/phase25e-contractor-commit-success-430x932.png",
+    "screenshots/phase25e-contractor-commit-success-480x900.png",
+    "screenshots/phase25e-team-no-site-360x740.png",
+    "screenshots/phase25e-team-no-site-390x844.png",
+    "screenshots/phase25e-team-no-site-430x932.png",
+    "screenshots/phase25e-team-no-site-480x900.png"
+  ],
+  "assertions": [
+    {
+      "name": "contractor selected-site dashboard",
+      "status": "PASS",
+      "detail": "Selected site and site management | Mr. Mehta | Scan QR"
+    },
+    {
+      "name": "contractor reserved cart",
+      "status": "PASS",
+      "detail": "Scan cart | Ready to add | Reserved in cart | Add to account"
+    },
+    {
+      "name": "reserved-cart navigation guard",
+      "status": "PASS",
+      "detail": "Add reserved points first | Add to account | Stay on Scan"
+    },
+    {
+      "name": "cart commit success",
+      "status": "PASS",
+      "detail": "Points added to account"
+    },
+    {
+      "name": "team member no-site guidance",
+      "status": "PASS",
+      "detail": "Logged in for contractor | Mahesh Patil | No site available | Ask the contractor to create a site first."
+    },
+    {
+      "name": "runtime console",
+      "status": "PASS",
+      "detail": "No console errors or runtime exceptions captured."
+    }
+  ],
+  "consoleErrors": [],
+  "runtimeExceptions": [],
+  "api": {
+    "contractor": "Ramesh Sharma",
+    "contractorSite": {
+      "siteId": "cmreu2b9b0001ljrs3o2ow4ga",
+      "clientName": "Mr. Mehta"
+    },
+    "printedQr": {
+      "invoiceNumber": "existing reserved cart",
+      "productName": "WIPRO-LED-9W",
+      "qrUnitId": "cmr7kp8gu000evursubojys8v",
+      "points": 60,
+      "existingReservedItems": 3
+    },
+    "teamMemberNoSiteContractor": "Mahesh Patil"
+  }
+}

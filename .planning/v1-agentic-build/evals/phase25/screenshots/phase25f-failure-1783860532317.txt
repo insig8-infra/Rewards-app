@@ -1,0 +1,136 @@
+Manage
+Contractors
+Registration and profile controls
+24
+Active
+1
+Inactive
+5
+Sites
+34
+Scans
+Register contractor
+Full name
+Mobile number
+Upload photo
+Saving
+Directory
+VK
+Vijay Kulkarni
+CTR-000025 · 9160448406
+0 points available · 0 sites
+ACTIVE
+Neel
+CTR-000024 · 9444888881
+0 points available · 0 sites
+ACTIVE
+Suresh Pawar
+CON-0003 · 9000001003
+1650 points available · 0 sites
+ACTIVE
+MP
+Mahesh Patil
+CON-0002 · 9000001002
+2100 points available · 0 sites
+ACTIVE
+Amit Verma
+CTR-000021 · 9170653300
+0 points available · 0 sites
+ACTIVE
+Anil Deshmukh
+CTR-000020 · 9088812345
+0 points available · 0 sites
+ACTIVE
+Vikram Patil
+CTR-000019 · 9100787472
+0 points available · 0 sites
+ACTIVE
+Mahesh Yadav
+CTR-000018 · 9948301549
+10 points available · 1 sites
+ACTIVE
+Amit Verma
+CTR-000017 · 9049815487
+10 points available · 1 sites
+ACTIVE
+Vikram Patil
+CTR-000016 · 9799841318
+0 points available · 0 sites
+ACTIVE
+Sanjay Chavan
+CTR-000015 · 9337541695
+0 points available · 0 sites
+ACTIVE
+Sachin Tendulkar
+CTR-000014 · 9876543210
+0 points available · 0 sites
+ACTIVE
+Prakash Shinde
+CTR-000013 · 9777464994
+0 points available · 0 sites
+ACTIVE
+Manoj Tiwari
+CTR-000012 · 9219158472
+0 points available · 0 sites
+ACTIVE
+Arun Nair
+CTR-000011 · 9910064554
+0 points available · 0 sites
+ACTIVE
+Deepak Singh
+CTR-000010 · 7872950385
+0 points available · 0 sites
+DEACTIVATED
+SS
+Sail Sabnis
+CTR-000009 · 9930477758
+0 points available · 0 sites
+ACTIVE
+Kiran More
+CTR-000008 · 8842041597
+0 points available · 0 sites
+ACTIVE
+Rajesh Gupta
+CTR-000007 · 9062611227
+0 points available · 0 sites
+ACTIVE
+Nitin Jadhav
+CTR-000006 · 9026298849
+0 points available · 0 sites
+ACTIVE
+Suresh Pawar
+CTR-000005 · 9917561141
+0 points available · 0 sites
+ACTIVE
+Mahesh Yadav
+CTR-000004 · 9888800011
+0 points available · 0 sites
+ACTIVE
+Amit Verma
+CTR-000003 · 9442587401
+0 points available · 0 sites
+ACTIVE
+Vikram Patil
+CTR-000002 · 9475963114
+0 points available · 0 sites
+ACTIVE
+Ramesh Sharma
+CON-0001 · 9000001001
+2130 points available · 3 sites
+ACTIVE
+Registering contractor
+D
+D
+Dash
+QR
+QR
+Return
+C
+C
+Contract
+R
+R
+Rewards
+R
+R
+Reports

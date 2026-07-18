@@ -1,0 +1,24 @@
+- generic [ref=e4] [box=0,0,780,1688]:
+  - generic [ref=e5] [box=0,0,780,110]:
+    - generic [ref=e6] [box=24,24,203,70]:
+      - generic [ref=e7] [box=24,24,203,43]: वोल्ट रिवॉर्ड्स
+      - generic [ref=e8] [box=24,71,203,23]: स्कैन करें, कमाएं और रिवॉर्ड ट्रैक करें
+    - button "EN" [ref=e32] [cursor=pointer] [box=713,43,43,33]:
+      - generic [ref=e10] [box=725,51,19,17]: EN
+  - generic [ref=e12] [box=0,110,780,557]:
+    - generic [ref=e13] [box=16,126,748,53]:
+      - button "कॉन्ट्रैक्टर" [ref=e33] [cursor=pointer] [box=20,130,370,45]:
+        - generic [ref=e15] [box=179,142,53,21]: कॉन्ट्रैक्टर
+      - button "टीम मेंबर" [active] [ref=e34] [cursor=pointer] [box=390,130,370,45]:
+        - generic [ref=e17] [box=550,142,50,21]: टीम मेंबर
+    - generic [ref=e39] [box=16,195,748,299]:
+      - generic [ref=e40] [box=33,212,714,31]: टीम मेंबर
+      - generic [ref=e41] [box=33,255,714,70]:
+        - generic [ref=e42] [box=33,255,714,18]: कॉन्ट्रैक्टर मोबाइल नंबर
+        - textbox "कॉन्ट्रैक्टर मोबाइल नंबर" [ref=e43] [box=33,277,714,48]
+      - generic [ref=e44] [box=33,337,714,70]:
+        - generic [ref=e45] [box=33,337,714,18]: आपका मोबाइल नंबर
+        - textbox "आपका मोबाइल नंबर" [ref=e46] [box=33,359,714,48]
+      - button "OTP भेजें" [ref=e47] [cursor=pointer] [box=33,427,714,50]:
+        - generic [ref=e48] [box=361,441,57,23]: OTP भेजें
+    - generic [ref=e31] [box=28,522,724,21]: कैमरा और कॉन्टैक्ट्स का उपयोग केवल आपके चुनने पर होगा.

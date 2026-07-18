@@ -1,0 +1,40 @@
+{
+  "name": "@volt-rewards/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:diff": "prisma migrate diff --from-empty --to-schema=prisma/schema.prisma --script --output prisma/migrations/202606220001_init/migration.sql",
+    "db:seed": "prisma db seed",
+    "prebuild": "npm run build --workspace @volt-rewards/domain && npm run prisma:generate",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "npm run build && node --test dist/*.test.js dist/**/*.test.js",
+    "pretypecheck": "npm run build --workspace @volt-rewards/domain && npm run prisma:generate",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prelint": "npm run build --workspace @volt-rewards/domain && npm run prisma:generate",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.27",
+    "@nestjs/core": "11.1.27",
+    "@nestjs/platform-fastify": "11.1.27",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "@volt-rewards/domain": "0.1.0",
+    "dotenv": "17.4.2",
+    "pg": "8.22.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "11.1.27"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

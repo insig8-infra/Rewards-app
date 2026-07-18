@@ -1,0 +1,30 @@
+{
+  "name": "@volt-rewards/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "dev": "expo start --host 0.0.0.0",
+    "web": "expo start --web --port 3002",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run typecheck && node --import tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@callstack/liquid-glass": "^0.8.0",
+    "@expo/metro-runtime": "^57.0.2",
+    "@react-navigation/bottom-tabs": "^8.0.0-alpha.39",
+    "@react-navigation/native": "^8.0.0-alpha.33",
+    "@react-navigation/native-stack": "^8.0.0-alpha.40",
+    "expo": "^57.0.1",
+    "expo-secure-store": "^57.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-native": "^0.86.0",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-screens": "^4.25.2",
+    "react-native-web": "^0.21.2"
+  }
+}

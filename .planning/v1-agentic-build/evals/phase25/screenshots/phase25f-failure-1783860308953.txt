@@ -1,0 +1,77 @@
+OWNER
+Shishir Mehta
+9000000091
+Logout
+Primary operation
+Return Scan
+Cancel unused QR or reverse points on returned products.
+QR
+23
+Contractors
+Open directory
+10
+Staff
+Owner reports
+9
+Claims
+Open Claim Desk
+3
+Reversed
+Return Scan
+QR status
+2
+Not printed
+183
+Printed
+18
+Scanned
+2
+Cancelled
+Owner controls
+F
+Claim Desk
+Fulfill rewards
+Send OTP, verify active claim, and mark Delivered.
+>
+C
+Directory
+Contractors
+Review contractor profiles, sites, points, and photos.
+>
+S
+Reports
+Staff and exports
+Open live reports and OWNER staff management.
+>
+Recent activity
+Admin Mobile Login
+STAFF · USER
+12 Jul
+Admin Mobile Login
+OWNER · USER
+12 Jul
+Team Member Otp Verified
+TEAM_MEMBER · CONTRACTOR
+12 Jul
+Team Member Otp Requested
+TEAM_MEMBER · CONTRACTOR
+12 Jul
+Team Member Otp Verified
+TEAM_MEMBER · CONTRACTOR
+12 Jul
+Dashboard updated
+D
+D
+Dash
+QR
+QR
+Return
+C
+C
+Contract
+R
+R
+Rewards
+R
+R
+Reports

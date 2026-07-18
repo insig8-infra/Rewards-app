@@ -1,0 +1,7 @@
+ALTER TABLE "Promotion"
+ADD COLUMN "assetAltText" TEXT,
+ADD COLUMN "overlayText" TEXT,
+ADD COLUMN "overlayTextColor" TEXT NOT NULL DEFAULT '#FFFFFF',
+ADD COLUMN "overlayFontSize" INTEGER NOT NULL DEFAULT 24,
+ADD COLUMN "overlayFontStyle" TEXT NOT NULL DEFAULT 'bold',
+ADD COLUMN "archivedAt" TIMESTAMP(3);

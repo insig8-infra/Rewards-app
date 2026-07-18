@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Volt Admin",
+    "slug": "volt-admin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "voltadmin",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.insig8.voltadmin",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Volt Admin uses the camera to scan returned product QR labels for cancellation and reversal workflows."
+      }
+    },
+    "android": {
+      "package": "com.insig8.voltadmin",
+      "permissions": ["CAMERA"],
+      "adaptiveIcon": {
+        "backgroundColor": "#00535B"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-secure-store"],
+    "extra": {
+      "apiBaseUrl": "http://127.0.0.1:3000/api"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+Issues identified - 
+
+Across both apps - one common issue is the look and feel m UI/UX Design , placement of buttons, elements - looks very low quality. 
+If we dont have resources to build high quality apps then lets source it from the internet. Lets research all production grade , highly successful Rewards and loyalty app and other high engaging app (that people are hooked to) and borrow those design . templates, ideas into ours. We are building a cross-platform app and in testing we should not miss any element that may be an obvious issue during beta testing with actual users. 
+Assume a role of top-end Highly experienced UI/UX Engineer and Designer who has shipped highly successful Consumer apps in 2026. 
+
+Admin Mobile (Cross-platform) APP- 
+
+1. Login in has "Show" instead of eye icon for unmasking Pin
+2. Overall look and feel, font style, font Size, placement of elements seems very clunky and old.  
+3. It should be icon based more than text heavy. For elements, animations, good designs - dont just rely on basic types - search good templates , desing elements across the internet that suits such Rewards and Loyalty App. 
+4. App should look clean and polished.
+5. On Dashboard - Return Operations highlight is not so significant, QR Status seems waste of space, Owner COntrols are just text - they need to be placed in a better way and that too make them functional.  Strategise overall Dashboard design - What makes sense to highlight, what makes sense to place at the top, at the bottom etc. what is taking unnecessaryly too much space etc. 
+6. Owner controls is just a line on dashbaord with text placed on dashbaord without any though. as a top UI/UX Engineer and designer think how the admin app can be designed to incorporate these in our app. 
+7. 23 Contractors , 10 Staff etc. are just texts, instead Give Manage link on click that takes the owner to respective workflows. 
+8. Ensure inside "Contractors" tab there are other workflows integrated as well just like what we have in Admin Web Portal. 
+9. Ensure Navigation is perfect when jumping from one screen to another, different tabs. 
+10. Ensure inside "Staff" tab there are other workflows integrated as well just like what we have in Admin Web Portal. 
+11. Ensure inside "Reports" tab there are other workflows integrated as well just like what we have in Admin Web Portal.
+12. Rewards tab is too cluttered with all workflows under one another. Add section , sub -tabs to declutter it and organise each workflow section. 
+
+End-User Mobile (Cross-platform) App - 
+
+1. There should not be "Selected site" by default, everytime "Scan QR" is clicked > contractor first selects the site, once inside that site > they can scan multiple QRs without having to select the site everytime. Think about ease of scan for the end-users as well as ensuring correct site is selected before every batch of scan. Select a Site > Scan 1 > Scan 2 >Scan 3 and so on .... > page shows all items scanned, total points to collect > "Add to account" > Success Screen or Error Screen for any possible error at this stage > takes them back to their "cart" / page showing all items scanned > user tries again.  
+2. Overall look and feel, font style, font Size, placement of elements seems very clunky and old.  
+3. It should be icon based more than text heavy. For elements, animations, good designs - dont just rely on basic types - search good templates , desing elements across the internet that suits such Rewards and Loyalty App. 
+4. App should look clean and polished. 
+5. While designing the elements ensure the text represented is within the bounds of those elements, is not getting cut off etc. For examplke the Rewards tiles in featured rewards almost every line is getting cut off, i can only read a few words of each line. 
+6. The Header of promotional banner  and its description is ON the banner itself , overlayed on the promotion banner. Instead they should be on top of the image (outside the image section) 
+7. Contractor should be able to Set / edit / remove their profile picture when they click on their profile. 
+8. History should be named "Scan History". Scan History should not truncate QR Attempt ID or details . no need of profile picture placeholder, instead it should show if COntractor himself scanned it or Team Member scanned it.
+9. Check "Scan Details" fields - Are all perfectly setup / wired up? Correct Failor Reasons shown? one already claimed attempt shows +100 in points, is it correct? different details are shown for different types of attempt - Scan details should show all relevant fields uniformly across all types of attempts. 
+10. Rewards - Mismatch in points available , Lifetime points collected . ensure the calculation and math behind points and rewards never fails. This needs to be 100% accurate.
+
+MANUALUAT2A
+
+End-User App 
+
+Logged in as a Contractor - 
+1. Added a new site - but the use site feature seems useless, clicking on a site from the list should be enough to make it selected. Only when View Details is clicked it open up the details page. 
+2. On selecting a site, it should take the user to the dashboard where they can see the Selected Site updated.  Selected Site Section Should be Repostioned with Selected Site and Manage / Add Sites. Without making the title too big, rename it such that user knows this is the place to manage site or change selection. 
+3. Scan QR button updated with that site as selected site. 
+4. Change colour of Scan Cart "Reserved in Cart" section. It should idenitfy itself seperately to the cart items below. Also, it should have a shortcut to "Add to Account" that saves user from scrolling all the way (if they dont want to)
+5. No success message after "add to account". It's an important pop-up. 
+6. One major issue identified - I tested a high value QR token of 4000 points and the scan failed because it reached the cart limit of 1000 points even though my cart was empty.Remove the cart limit altogether, instead make sure if the user tries to jump to any other section of the app apart from the Scan section of the selected site then it get a pop-up message to add to account collected points first with a button to add to account with that message and a go-back message which takes them back to scan section of the selected site. 
+7. The icons on bottom navigation and across the app , the font style , font size, graphics and animation , elements used - all look very basic. Use a modern / aesthetic , clean and minimal UI UX library with sets of icons, font styles, animations, graphics, click effect and everything else that makes a modern 2026 cross-platform app truly well-made with thoughtful design. 
+8. At some places on the app - it still shows Reward Points / QR points in Rupees (Rs) - it should be all points. Refer to the list of products and its points here - [text](../../Sample_References/electrical_retail_products_rewards_points.md) - worth updating across our entire platform and database including existing examples to align with this. 
+9. Scan History > Scan Details > If its a "Reserved in Cart" then give a shortcut to "Add to Account". 
+
+
+Persona Team Member - 
+1. a team Member logs in and Select Site does not work if that contractor has not created any site yet. Instead , it should give a pop up message to the team member to ask them to ask that contractor (with actual name) to create a site first. 
+2. Logout is misplaced. Should be correctly placed in the design of the app. 
+3. Camera and contacts are used only when you choose those actions. - such internal language must not be shown. 
+4. Limited session: scan QR codes, select a site, and view only your scan history. - internal langauge. needs to be rewritten for user facing. 
+5. Remove Select Site and Scan History bottons from main landing page. 
+6. Selected Site Section Should be Repostioned with Selected Site and Manage / Add Sites. Without making the title too big, rename it such that user knows this is the place to SELECT / CHANGE a site on click. 
+7. In the Scan QR section - remove the small site tiles , if a contractor has 10 15 sites then it clutters the UI.  
+8. On Landing page it says Contractor Photo, name, phone number but it's title says "Team Member". Instead it should be You are logged in as COntractor : Contractor Name, phone, picture.

@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Electrician Loyalty QR Platform - Pilot Scope, Timeline & Cost Breakdown</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: #111827;
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.42;
+    }
+
+    .document {
+      width: 100%;
+    }
+
+    .cover {
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1f4e79;
+      margin-bottom: 18px;
+    }
+
+    .kicker {
+      margin: 0 0 8px 0;
+      color: #1f4e79;
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      color: #0b2545;
+      font-size: 23pt;
+      line-height: 1.08;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0 0 14px 0;
+      color: #374151;
+      font-size: 12pt;
+      line-height: 1.35;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 18px;
+      margin-top: 12px;
+      color: #111827;
+      font-size: 9.5pt;
+    }
+
+    .meta-grid div {
+      border-top: 1px solid #d9e2ec;
+      padding-top: 5px;
+    }
+
+    .label {
+      color: #4b5563;
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 18px 0 8px 0;
+      color: #1f4e79;
+      font-size: 15.5pt;
+      line-height: 1.2;
+      break-after: avoid;
+    }
+
+    h3 {
+      margin: 14px 0 7px 0;
+      color: #1f4e79;
+      font-size: 12.2pt;
+      line-height: 1.25;
+      break-after: avoid;
+    }
+
+    p {
+      margin: 0 0 8px 0;
+    }
+
+    ul, ol {
+      margin: 0 0 9px 20px;
+      padding: 0;
+    }
+
+    li {
+      margin: 0 0 4px 0;
+    }
+
+    .lead {
+      font-size: 11pt;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+
+    .callout {
+      margin: 12px 0 14px 0;
+      padding: 10px 12px;
+      border-left: 4px solid #1f4e79;
+      background: #f3f7fb;
+      break-inside: avoid;
+    }
+
+    .callout strong {
+      color: #0b2545;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 0 14px 0;
+      break-inside: avoid;
+    }
+
+    .summary-card {
+      border: 1px solid #d9e2ec;
+      background: #f8fafc;
+      padding: 9px 10px;
+      min-height: 58px;
+    }
+
+    .summary-card .number {
+      display: block;
+      color: #0b2545;
+      font-size: 15pt;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .summary-card .caption {
+      display: block;
+      color: #4b5563;
+      font-size: 8.8pt;
+      margin-top: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px 0;
+      table-layout: fixed;
+      break-inside: auto;
+    }
+
+    thead {
+      display: table-header-group;
+    }
+
+    tr {
+      break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid #cfd8e3;
+      padding: 6px 7px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    th {
+      background: #e8eef5;
+      color: #0b2545;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .muted {
+      color: #4b5563;
+    }
+
+    .small {
+      font-size: 9pt;
+    }
+
+    .cost-table td:nth-child(2),
+    .cost-table th:nth-child(2) {
+      text-align: right;
+      white-space: normal;
+    }
+
+    .total-row td {
+      background: #f3f7fb;
+      color: #0b2545;
+      font-weight: 700;
+    }
+
+    .page-break {
+      break-before: page;
+    }
+
+    .notes {
+      margin-top: 8px;
+      font-size: 9.2pt;
+      color: #374151;
+    }
+
+    .source-list {
+      font-size: 8.8pt;
+      line-height: 1.35;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      padding-top: 8px;
+      border-top: 1px solid #d9e2ec;
+      color: #4b5563;
+      font-size: 8.8pt;
+    }
+
+    @media print {
+      a {
+        color: #111827;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <section class="cover">
+      <p class="kicker">Pilot Proposal Cost Note</p>
+      <h1>Electrician Loyalty QR Platform</h1>
+      <p class="subtitle">Pilot scope, delivery timeline, recommended tools/services, and client-borne cost breakdown for the electrical retailer loyalty app.</p>
+      <div class="meta-grid">
+        <div><span class="label">Prepared for:</span> Client discussion</div>
+        <div><span class="label">Prepared on:</span> 04 June 2026</div>
+        <div><span class="label">Pilot duration:</span> 6 weeks</div>
+        <div><span class="label">Pilot users:</span> 5 electricians + admin/operator staff</div>
+        <div><span class="label">Pilot category:</span> Wires</div>
+        <div><span class="label">Android delivery:</span> Direct APK / internal testing build</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Executive Summary</h2>
+      <p class="lead">The pilot will test a full loyalty workflow where the retailer prints secure QR labels for individual invoiced products, electricians scan those labels from a native Android app, and the retailer tracks point credit, history, return reversals, and basic redemption readiness from an admin panel.</p>
+
+      <div class="summary-strip">
+        <div class="summary-card">
+          <span class="number">₹1,00,000</span>
+          <span class="caption">One-time pilot development charge</span>
+        </div>
+        <div class="summary-card">
+          <span class="number">₹18,500-₹27,500</span>
+          <span class="caption">Estimated client-borne pilot setup/operating costs*</span>
+        </div>
+        <div class="summary-card">
+          <span class="number">₹1.2L-₹1.3L</span>
+          <span class="caption">Practical total pilot budget range*</span>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Important:</strong> QR codes will not be printed inside the BUSY invoice. BUSY will continue to print the invoice normally. The retailer's staff will open the admin panel, select the latest BUSY invoice, and click <strong>Print QR Labels</strong> to print one QR label per invoiced product unit on a separate QR label printer.
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Pilot Scope</h2>
+      <h3>Included In Pilot</h3>
+      <ul>
+        <li>Native Android electrician app distributed as direct APK/internal testing build.</li>
+        <li>OTP login for admin-registered electricians only.</li>
+        <li>Bottom navigation in electrician app: Home, Scan, History, Redeem.</li>
+        <li>Bronze/Silver/Gold virtual tier display.</li>
+        <li>PIN-style protection for redemption and total accumulated points.</li>
+        <li>Admin web panel for electrician registration, SKU/category setup, point rules, BUSY invoice selection, QR label printing, returns, and reporting.</li>
+        <li>BUSY invoice integration based on client-provided SQL/API access.</li>
+        <li>One secure QR label per invoiced product unit for the pilot category.</li>
+        <li>QR expiry, one-time redemption, duplicate scan prevention, and return reversal ledger.</li>
+        <li>Basic notification readiness through app push notifications, if required for pilot communication.</li>
+      </ul>
+
+      <h3>Outside Pilot Scope</h3>
+      <ul>
+        <li>Play Store publication. The pilot uses APK/internal testing distribution.</li>
+        <li>QR code placement inside the BUSY invoice layout.</li>
+        <li>Fully automatic QR printing directly triggered by BUSY invoice print action.</li>
+        <li>Multiple product categories beyond Wires.</li>
+        <li>Fully automated UPI/bank payout workflow.</li>
+        <li>Advanced fraud analytics, distributor-level reporting, or large-scale production rollout.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Pilot Workflow</h2>
+      <ol>
+        <li>Retailer creates an invoice in BUSY accounting software.</li>
+        <li>BUSY prints the normal invoice.</li>
+        <li>Retailer staff opens the loyalty admin panel.</li>
+        <li>Staff selects the latest BUSY invoice and clicks <strong>Print QR Labels</strong>.</li>
+        <li>System reads invoice item data from BUSY SQL/API access.</li>
+        <li>System generates one secure QR label per product unit in that invoice.</li>
+        <li>QR labels are printed on a separate label printer and stuck on the products.</li>
+        <li>Registered electricians scan labels in the Android app to collect points.</li>
+        <li>Admin can scan returned material labels to reverse points where applicable.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>4. Delivery Timeline</h2>
+      <table>
+        <colgroup>
+          <col style="width: 16%;">
+          <col style="width: 34%;">
+          <col style="width: 34%;">
+          <col style="width: 16%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Focus</th>
+            <th>Key Deliverables</th>
+            <th>Status Gate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Week 1</td>
+            <td>Final scope lock and technical setup</td>
+            <td>Confirm BUSY access, SKU/points rules, QR expiry, printer setup, Android project, database model.</td>
+            <td>Build-ready</td>
+          </tr>
+          <tr>
+            <td>Week 2</td>
+            <td>Backend foundation and admin basics</td>
+            <td>Authentication, electrician registration, SKU/category setup, point rule setup, audit-friendly data model.</td>
+            <td>Admin foundation</td>
+          </tr>
+          <tr>
+            <td>Week 3</td>
+            <td>BUSY invoice and QR label flow</td>
+            <td>Invoice lookup, line item mapping, secure QR generation, duplicate prevention, label print layout.</td>
+            <td>QR print test</td>
+          </tr>
+          <tr>
+            <td>Week 4</td>
+            <td>Android electrician app</td>
+            <td>OTP login, Home, Scan, History, Redeem, tier display, PIN-protected sections.</td>
+            <td>APK test build</td>
+          </tr>
+          <tr>
+            <td>Week 5</td>
+            <td>Returns, reporting, and notifications</td>
+            <td>Return scan/reversal, electrician totals/history, basic notifications, error states, operational safeguards.</td>
+            <td>End-to-end UAT</td>
+          </tr>
+          <tr>
+            <td>Week 6</td>
+            <td>Pilot hardening and handover</td>
+            <td>Bug fixes, pilot data setup, APK handover, admin training, sample invoice-to-scan workflow validation.</td>
+            <td>Pilot launch</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="notes">* Timeline assumes timely BUSY access, printer availability, SMS/OTP onboarding, and client feedback. Vendor or network delays may shift delivery dates.</p>
+    </section>
+
+    <section class="page-break">
+      <h2>5. Recommended Tools And Services</h2>
+      <table>
+        <colgroup>
+          <col style="width: 25%;">
+          <col style="width: 31%;">
+          <col style="width: 44%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Recommended Tool / Service</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Electrician app</td>
+            <td>Native Android with Kotlin + Jetpack Compose</td>
+            <td>Native APK, strong camera control, and good fit for bottom navigation, scan flow, history, tier card, and PIN-protected views.</td>
+          </tr>
+          <tr>
+            <td>QR scanning</td>
+            <td>Google ML Kit Barcode Scanning</td>
+            <td>Proven Android QR scanning library; avoids custom camera/QR parsing logic.</td>
+          </tr>
+          <tr>
+            <td>Admin panel</td>
+            <td>Next.js web admin</td>
+            <td>Fast pilot delivery for forms, invoice selection, reporting, QR generation, and print pages.</td>
+          </tr>
+          <tr>
+            <td>Backend/API</td>
+            <td>Next.js API / Node.js service</td>
+            <td>Keeps admin and backend delivery simple for pilot while supporting secure QR/token/points logic.</td>
+          </tr>
+          <tr>
+            <td>Database</td>
+            <td>Neon PostgreSQL Launch plan, or equivalent</td>
+            <td>Managed PostgreSQL for electricians, QR tokens, point ledger, scans, returns, redemptions, and audit logs.</td>
+          </tr>
+          <tr>
+            <td>Hosting</td>
+            <td>Vercel Pro, or equivalent</td>
+            <td>Commercial-ready HTTPS hosting and deployment workflow for admin/API.</td>
+          </tr>
+          <tr>
+            <td>OTP/SMS</td>
+            <td>MSG91 OTP</td>
+            <td>India-focused OTP provider with public India OTP pricing.</td>
+          </tr>
+          <tr>
+            <td>APK distribution / push</td>
+            <td>Firebase App Distribution + Firebase Cloud Messaging</td>
+            <td>No-cost pilot-friendly APK distribution and native push notification channel.</td>
+          </tr>
+          <tr>
+            <td>QR label printer</td>
+            <td>TSC TE244 thermal transfer barcode printer</td>
+            <td>Reliable, cost-effective, India-available desktop barcode printer. Recommendation can be changed after vendor quote/testing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>6. Cost Breakdown</h2>
+      <h3>6.1 One-Time Development Charge</h3>
+      <table class="cost-table">
+        <colgroup>
+          <col style="width: 34%;">
+          <col style="width: 18%;">
+          <col style="width: 18%;">
+          <col style="width: 30%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Cost</th>
+            <th>Paid To</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Pilot application development</td>
+            <td><strong>₹1,00,000</strong></td>
+            <td>Development team</td>
+            <td>Includes Android electrician app, admin panel, backend/API, QR logic, BUSY integration workflow, and pilot deployment. Taxes, if applicable, to be confirmed separately.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.2 Client-Borne Pilot Costs</h3>
+      <table class="cost-table">
+        <colgroup>
+          <col style="width: 30%;">
+          <col style="width: 18%;">
+          <col style="width: 16%;">
+          <col style="width: 36%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Estimated Cost</th>
+            <th>Type</th>
+            <th>Notes / Conditions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TSC TE244 QR label printer*</td>
+            <td>₹8,000-₹12,000</td>
+            <td>One-time</td>
+            <td>Recommendation only. Final price depends on vendor quote, GST, warranty, and local availability.</td>
+          </tr>
+          <tr>
+            <td>Thermal-transfer QR labels*</td>
+            <td>₹1,000-₹2,500</td>
+            <td>Initial consumable</td>
+            <td>Recommend 50mm x 25mm or 50mm x 30mm adhesive labels. Final cost depends on roll quantity/material.</td>
+          </tr>
+          <tr>
+            <td>Wax-resin / wax ribbon*</td>
+            <td>₹500-₹1,500</td>
+            <td>Initial consumable</td>
+            <td>Wax-resin preferred if labels need stronger handling durability.</td>
+          </tr>
+          <tr>
+            <td>OTP SMS credits*</td>
+            <td>₹1,475 approx.</td>
+            <td>Prepaid usage</td>
+            <td>MSG91 5,000 OTP pack: ₹1,250 + 18% GST. Pilot usage will be lower, but minimum pack may apply.</td>
+          </tr>
+          <tr>
+            <td>Domain name</td>
+            <td>₹1,000-₹2,000/year</td>
+            <td>Annual</td>
+            <td>Optional if client wants branded admin URL. Exact cost depends on `.in`, `.com`, or selected domain.</td>
+          </tr>
+          <tr>
+            <td>Hosting for admin/API*</td>
+            <td>₹1,900-₹2,200/month</td>
+            <td>Monthly</td>
+            <td>Based on Vercel Pro $20/month + usage at approx. ₹96/USD. Pilot should fit included limits.</td>
+          </tr>
+          <tr>
+            <td>Managed PostgreSQL database*</td>
+            <td>₹1,400-₹1,800/month</td>
+            <td>Monthly</td>
+            <td>Based on Neon Launch approx. $15/month. Free tier may work for demo; paid plan is safer for pilot reliability.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.3 Estimated Pilot Budget</h3>
+      <table class="cost-table">
+        <colgroup>
+          <col style="width: 70%;">
+          <col style="width: 30%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Estimate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Hardware + initial printing consumables</td>
+            <td>₹9,500-₹16,000</td>
+          </tr>
+          <tr>
+            <td>OTP initial pack</td>
+            <td>₹1,475 approx.</td>
+          </tr>
+          <tr>
+            <td>Domain</td>
+            <td>₹1,000-₹2,000</td>
+          </tr>
+          <tr>
+            <td>2 months hosting + database</td>
+            <td>₹6,600-₹8,000</td>
+          </tr>
+          <tr class="total-row">
+            <td>Estimated client-borne pilot costs, excluding development</td>
+            <td>₹18,500-₹27,500 approx.</td>
+          </tr>
+          <tr>
+            <td>Development charge</td>
+            <td>₹1,00,000</td>
+          </tr>
+          <tr class="total-row">
+            <td>Estimated total pilot budget</td>
+            <td>₹1,18,500-₹1,27,500 approx.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="notes">* Recommended client-facing range: <strong>₹1.2L-₹1.3L plus BUSY vendor/customization charges, if any, and actual reward payout budget.</strong></p>
+    </section>
+
+    <section>
+      <h2>7. Conditional / Not Included Costs</h2>
+      <table>
+        <colgroup>
+          <col style="width: 32%;">
+          <col style="width: 24%;">
+          <col style="width: 44%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Estimate</th>
+            <th>When It Applies</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Local BUSY connector / on-prem bridge</td>
+            <td>Usually included if simple</td>
+            <td>Needed if cloud backend cannot directly reach BUSY local server/API. Extra cost may apply if network/security setup is complex.</td>
+          </tr>
+          <tr>
+            <td>BUSY API/customization/vendor support</td>
+            <td>Vendor quote required</td>
+            <td>Client to bear any BUSY partner charges for SQL/API access, schema support, or integration assistance.</td>
+          </tr>
+          <tr>
+            <td>Static IP/VPN/network setup</td>
+            <td>Vendor/ISP quote required</td>
+            <td>Only needed if direct secure access to BUSY server is required and outbound connector sync is not sufficient.</td>
+          </tr>
+          <tr>
+            <td>Reward/redemption payout budget</td>
+            <td>Client-defined</td>
+            <td>Points liability, coupons, gifts, UPI payouts, or rewards are business costs and not included in software development.</td>
+          </tr>
+          <tr>
+            <td>SMS/WhatsApp notifications beyond OTP</td>
+            <td>Usage-based</td>
+            <td>Only needed if client wants marketing or transactional messages beyond app push notifications.</td>
+          </tr>
+          <tr>
+            <td>Play Store publication</td>
+            <td>Not included</td>
+            <td>Pilot uses direct APK/internal testing. Store publication can be estimated separately if required later.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>8. Conditions And Explanations</h2>
+      <ul>
+        <li><strong>* Printer recommendation:</strong> TSC TE244 is recommended based on current research for India/Gujarat availability, reliability, QR support, and cost-effectiveness. It is not mandatory; any equivalent thermal-transfer barcode printer can be used after testing.</li>
+        <li><strong>* Label/ribbon estimates:</strong> Label and ribbon cost depends on selected label size, roll quantity, adhesive quality, and supplier. Final purchase should happen only after sample print and scan testing.</li>
+        <li><strong>* OTP pricing:</strong> OTP pricing is based on MSG91 public India OTP pricing. DLT registration, sender/template approval, and account setup may be required.</li>
+        <li><strong>* Hosting/database pricing:</strong> USD-denominated cloud services are estimated at ₹96/USD. Final billing may vary with exchange rate, taxes, and actual usage.</li>
+        <li><strong>* BUSY assumption:</strong> Current working assumption is that BUSY data is available on a local server through SQL/API access. Final integration effort depends on the actual BUSY version, schema/API, network access, and client security policy.</li>
+        <li><strong>* Timeline condition:</strong> The 6-week timeline assumes timely access to BUSY data, printer procurement, OTP onboarding, and client feedback.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Assumptions To Confirm Before Build Freeze</h2>
+      <ul>
+        <li>BUSY local server/API access and technical contact are available.</li>
+        <li>Client confirms pilot category and SKU list for Wires.</li>
+        <li>Client defines QR expiry duration.</li>
+        <li>Client defines Bronze/Silver/Gold tier thresholds.</li>
+        <li>Client defines redemption rule for pilot: request only, gift/coupon, or manual payout.</li>
+        <li>Client provides 5 pilot electrician mobile numbers.</li>
+        <li>Client confirms printer vendor quote, warranty, and label size.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>10. Sources Checked</h2>
+      <p class="source-list">
+        TSC TE244 India listing: https://shop.tscprintersindia.com/product/tsc-te244-barcode-printer/<br>
+        TSC TE244 Ahmedabad/Gujarat listing: https://www.easo.co.in/barcode-label-printer-tsc-te244.html<br>
+        MSG91 OTP pricing India: https://msg91.com/in/pricing/otp<br>
+        Vercel pricing: https://vercel.com/pricing<br>
+        Neon pricing: https://neon.com/pricing<br>
+        Firebase pricing / no-cost products: https://firebase.google.com/pricing<br>
+        Namecheap domain pricing reference: https://www.namecheap.com/domains.aspx
+      </p>
+    </section>
+
+    <p class="footer-note">This document is a pilot estimate, not a final vendor invoice. Hardware, cloud, SMS, domain, reward, and BUSY vendor charges should be confirmed at purchase/onboarding time.</p>
+  </main>
+</body>
+</html>

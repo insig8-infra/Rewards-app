@@ -1,0 +1,224 @@
+{
+  "screenshots": [
+    "screenshots/phase26c-contractor-fresh-scan-no-site-360x740.png",
+    "screenshots/phase26c-contractor-fresh-scan-no-site-390x844.png",
+    "screenshots/phase26c-contractor-fresh-scan-no-site-430x932.png",
+    "screenshots/phase26c-contractor-fresh-scan-no-site-480x900.png",
+    "screenshots/phase26c-contractor-site-selected-scanner-360x740.png",
+    "screenshots/phase26c-contractor-site-selected-scanner-390x844.png",
+    "screenshots/phase26c-contractor-site-selected-scanner-430x932.png",
+    "screenshots/phase26c-contractor-site-selected-scanner-480x900.png",
+    "screenshots/phase26c-contractor-reserved-cart-360x740.png",
+    "screenshots/phase26c-contractor-reserved-cart-390x844.png",
+    "screenshots/phase26c-contractor-reserved-cart-430x932.png",
+    "screenshots/phase26c-contractor-reserved-cart-480x900.png",
+    "screenshots/phase26c-contractor-post-commit-site-cleared-360x740.png",
+    "screenshots/phase26c-contractor-post-commit-site-cleared-390x844.png",
+    "screenshots/phase26c-contractor-post-commit-site-cleared-430x932.png",
+    "screenshots/phase26c-contractor-post-commit-site-cleared-480x900.png",
+    "screenshots/phase26c-contractor-commit-failure-preserves-cart-360x740.png",
+    "screenshots/phase26c-contractor-commit-failure-preserves-cart-390x844.png",
+    "screenshots/phase26c-contractor-commit-failure-preserves-cart-430x932.png",
+    "screenshots/phase26c-contractor-commit-failure-preserves-cart-480x900.png",
+    "screenshots/phase26c-team-fresh-scan-no-site-360x740.png",
+    "screenshots/phase26c-team-fresh-scan-no-site-390x844.png",
+    "screenshots/phase26c-team-fresh-scan-no-site-430x932.png",
+    "screenshots/phase26c-team-fresh-scan-no-site-480x900.png",
+    "screenshots/phase26c-team-reserved-cart-no-points-360x740.png",
+    "screenshots/phase26c-team-reserved-cart-no-points-390x844.png",
+    "screenshots/phase26c-team-reserved-cart-no-points-430x932.png",
+    "screenshots/phase26c-team-reserved-cart-no-points-480x900.png",
+    "screenshots/phase26c-team-post-commit-site-cleared-360x740.png",
+    "screenshots/phase26c-team-post-commit-site-cleared-390x844.png",
+    "screenshots/phase26c-team-post-commit-site-cleared-430x932.png",
+    "screenshots/phase26c-team-post-commit-site-cleared-480x900.png"
+  ],
+  "assertions": [
+    {
+      "name": "contractor selected site on dashboard",
+      "status": "PASS",
+      "detail": "Joshi Residence | Scan QR"
+    },
+    {
+      "name": "contractor fresh scan starts without site",
+      "status": "PASS",
+      "detail": "Select a site before scanning. | Select a site to start scanning."
+    },
+    {
+      "name": "contractor qr token field hidden before site",
+      "status": "PASS",
+      "detail": "Absent: QR token"
+    },
+    {
+      "name": "contractor scanner title hidden before site",
+      "status": "PASS",
+      "detail": "Exact text absent: Scan Product QR"
+    },
+    {
+      "name": "contractor scanner visible after site",
+      "status": "PASS",
+      "detail": "Joshi Residence | Scan Product QR | QR token"
+    },
+    {
+      "name": "contractor reserved cart visible",
+      "status": "PASS",
+      "detail": "Scan cart | Ready to add | Reserved in cart | Add to account"
+    },
+    {
+      "name": "contractor commit clears scan site",
+      "status": "PASS",
+      "detail": "Points added to account | Select a site before scanning. | Select a site to start scanning."
+    },
+    {
+      "name": "contractor qr token and cart hidden after commit",
+      "status": "PASS",
+      "detail": "Absent: QR token, Ready to add"
+    },
+    {
+      "name": "contractor scanner title hidden after commit",
+      "status": "PASS",
+      "detail": "Exact text absent: Scan Product QR"
+    },
+    {
+      "name": "contractor failed commit preserves site and cart",
+      "status": "PASS",
+      "detail": "Joshi Residence | Ready to add | Add to account"
+    },
+    {
+      "name": "contractor cleanup commit clears site",
+      "status": "PASS",
+      "detail": "Select a site before scanning. | Select a site to start scanning."
+    },
+    {
+      "name": "team member fresh scan starts without site",
+      "status": "PASS",
+      "detail": "Logged in for contractor | Ramesh | Select a site before scanning. | Select a site to start scanning."
+    },
+    {
+      "name": "team member qr token field hidden before site",
+      "status": "PASS",
+      "detail": "Absent: QR token"
+    },
+    {
+      "name": "team member scanner title hidden before site",
+      "status": "PASS",
+      "detail": "Exact text absent: Scan Product QR"
+    },
+    {
+      "name": "team member scanner visible after site",
+      "status": "PASS",
+      "detail": "Joshi Residence | Scan Product QR | QR token"
+    },
+    {
+      "name": "team member scan success hides point total",
+      "status": "PASS",
+      "detail": "Team Member | Reserved in cart"
+    },
+    {
+      "name": "team member scan result hides points",
+      "status": "PASS",
+      "detail": "Absent: Points in cart"
+    },
+    {
+      "name": "team member reserved cart visible",
+      "status": "PASS",
+      "detail": "Scan cart | Ready to add | Reserved in cart | Add to account"
+    },
+    {
+      "name": "team member cart hides point total",
+      "status": "PASS",
+      "detail": "Absent: Points in cart"
+    },
+    {
+      "name": "team member commit clears scan site",
+      "status": "PASS",
+      "detail": "Select a site before scanning. | Select a site to start scanning."
+    },
+    {
+      "name": "team member qr token and cart hidden after commit",
+      "status": "PASS",
+      "detail": "Absent: QR token, Ready to add"
+    },
+    {
+      "name": "team member scanner title hidden after commit",
+      "status": "PASS",
+      "detail": "Exact text absent: Scan Product QR"
+    },
+    {
+      "name": "api scan history readback",
+      "status": "PASS",
+      "detail": "WIPRO-LED-BULB-DEMO, HAVELLS-WIRE-DEMO, ANCHOR-SWITCH-DEMO"
+    },
+    {
+      "name": "runtime console",
+      "status": "PASS",
+      "detail": "No console errors or runtime exceptions captured."
+    }
+  ],
+  "consoleErrors": [],
+  "runtimeExceptions": [],
+  "api": {
+    "activeSite": {
+      "siteId": "seed-site-1",
+      "clientName": "Joshi Residence",
+      "flatOrApartmentNo": "B-1202",
+      "buildingName": "Gulmohar Heights",
+      "area": "Andheri West",
+      "city": "Mumbai"
+    },
+    "contractor": "Ramesh Sharma",
+    "teamMemberMobile": "9000011111",
+    "qrTokensPrepared": [
+      {
+        "label": "QR 1",
+        "product": "Wipro LED Bulb",
+        "points": 50,
+        "invoiceNumber": "VR/DEMO/20260715173306"
+      },
+      {
+        "label": "QR 2",
+        "product": "Havells Wire Bundle",
+        "points": 120,
+        "invoiceNumber": "VR/DEMO/20260715173306"
+      },
+      {
+        "label": "QR 3",
+        "product": "Anchor Modular Switch",
+        "points": 200,
+        "invoiceNumber": "VR/DEMO/20260715173306"
+      },
+      {
+        "label": "QR 4",
+        "product": "Atomberg Ceiling Fan",
+        "points": 250,
+        "invoiceNumber": "VR/DEMO/20260715173306"
+      },
+      {
+        "label": "QR 5",
+        "product": "Polycab Cable Roll",
+        "points": 300,
+        "invoiceNumber": "VR/DEMO/20260715173306"
+      }
+    ],
+    "readback": {
+      "siteId": "seed-site-1",
+      "recentProducts": [
+        "ANCHOR-SWITCH-DEMO",
+        "HAVELLS-WIRE-DEMO",
+        "WIPRO-LED-BULB-DEMO",
+        "ANCHOR-SWITCH-DEMO",
+        "HAVELLS-WIRE-DEMO",
+        "WIPRO-LED-BULB-DEMO",
+        "HAVELLS-WIRE-DEMO",
+        "WIPRO-LED-BULB-DEMO",
+        "HAVELLS-WIRE-DEMO",
+        "WIPRO-LED-BULB-DEMO"
+      ],
+      "expectedSkus": [
+        "WIPRO-LED-BULB-DEMO",
+        "HAVELLS-WIRE-DEMO",
+        "ANCHOR-SWITCH-DEMO"
+      ]
+    }
+  }
+}
