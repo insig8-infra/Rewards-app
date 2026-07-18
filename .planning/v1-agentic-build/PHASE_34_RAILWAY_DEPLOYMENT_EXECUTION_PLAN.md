@@ -19,9 +19,9 @@ Deploy the Railway Test API from the GitHub repo, configure Railway service vari
 
 | Question | Phase 34 handling |
 | --- | --- |
-| Railway authentication | Blocking for agent-executed deployment. Need Railway UI access, Railway CLI login, or `RAILWAY_TOKEN` in ignored local env. |
+| Railway authentication | Railway UI path is in use. Agent still does not have Railway CLI access/token, so deploy/domain verification depends on user-provided Railway UI results. |
 | Railway plan | Trial is acceptable for the first proof if public domain, deploy, and Neon outbound connectivity work. Upgrade only if Railway blocks or sleeps the needed test service. |
-| Runtime secrets | Generated locally and exported to ignored `.env.railway.local`; must be copied/imported into Railway Variables. |
+| Runtime secrets | Generated locally and exported to ignored `.env.railway.local`; user confirmed the values were copied/imported into Railway Variables. |
 | Public API URL | Not known until Railway service public domain is generated. |
 
 ## Eval Criteria
@@ -37,10 +37,9 @@ Deploy the Railway Test API from the GitHub repo, configure Railway service vari
 ## Implementation Checklist
 
 - [x] Prepare ignored Railway variables file from local env.
-- [ ] Authenticate Railway access for agent or complete Railway UI connection manually.
-- [ ] Configure Railway project/service from GitHub.
-- [ ] Configure Railway Variables.
+- [x] Authenticate Railway access for agent or complete Railway UI connection manually.
+- [x] Configure Railway project/service from GitHub.
+- [x] Configure Railway Variables.
 - [ ] Generate Railway public domain.
 - [ ] Verify health endpoints.
 - [ ] Update BUSY handoff with actual test API base URL.
-
