@@ -12,9 +12,10 @@ import { ReportsModule } from "./reports/reports.module.js";
 import { RewardsModule } from "./rewards/rewards.module.js";
 import { SitesModule } from "./sites/sites.module.js";
 import { StaffModule } from "./staff/staff.module.js";
+import { StorageModule } from "./storage/storage.module.js";
 
 @Module({
-  imports: [AdminWebModule, BusyModule, ContractorsModule, DomainModule, ItemCodesModule, PoliciesModule, PromotionsModule, QrModule, ReportsModule, RewardsModule, SitesModule, StaffModule],
+  imports: [AdminWebModule, BusyModule, ContractorsModule, DomainModule, ItemCodesModule, PoliciesModule, PromotionsModule, QrModule, ReportsModule, RewardsModule, SitesModule, StaffModule, StorageModule],
   controllers: [HealthController],
 })
 export class AppModule {}

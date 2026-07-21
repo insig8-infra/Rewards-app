@@ -10,7 +10,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import { PointsLedgerType, type PointsLedgerType as PointsLedgerTypeValue } from "../generated/prisma/enums.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
-import { resolveMediaUrlForRead, uploadRewardImageToStorage } from "../storage/supabase-storage.js";
+import { resolveMediaUrlForRead, uploadRewardImageToStorage } from "../storage/media-storage.js";
 
 export type RewardTier = "Silver" | "Gold" | "Platinum" | "Diamond";
 

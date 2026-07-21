@@ -4,7 +4,7 @@ import { Prisma, type Promotion } from "../generated/prisma/client.js";
 import { PromotionStatus, PromotionTargetPersona } from "../generated/prisma/enums.js";
 import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { resolveMediaUrlForRead, uploadPromotionAssetToStorage } from "../storage/supabase-storage.js";
+import { resolveMediaUrlForRead, uploadPromotionAssetToStorage } from "../storage/media-storage.js";
 
 export type PromotionFontStyle = "regular" | "bold" | "italic" | "boldItalic";
 export type PromotionFontFamily =
