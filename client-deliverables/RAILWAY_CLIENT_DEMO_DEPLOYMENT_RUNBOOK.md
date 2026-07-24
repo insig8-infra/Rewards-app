@@ -21,7 +21,7 @@ Use the same GitHub repo for all services. Each service must point to its own Do
 
 | Railway service | Purpose | Dockerfile path | Required variables |
 | --- | --- | --- | --- |
-| `@volt-rewards/api` | Backend API | `apps/api/Dockerfile` | Existing API variables, `HOST=0.0.0.0`, `API_PUBLIC_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
+| `@volt-rewards/api` | Backend API | `apps/api/Dockerfile` | Existing API variables, `HOST=0.0.0.0`, `API_PUBLIC_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `CORS_ORIGIN=<comma-separated frontend URLs>` |
 | `@volt-rewards/admin-web` | Admin Web Portal | `apps/admin-web/Dockerfile` | `ADMIN_WEB_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `NEXT_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
 | `@volt-rewards/mobile` | End-user app laptop demo | `apps/mobile/Dockerfile` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
 | `@volt-rewards/admin-mobile` | Admin Mobile laptop demo | `apps/admin-mobile/Dockerfile` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
@@ -35,6 +35,7 @@ Use the same GitHub repo for all services. Each service must point to its own Do
 4. Open `Variables` and add the required variables for that service.
 5. Deploy the staged changes.
 6. Open `Settings` -> `Networking` and generate a public Railway domain for each frontend service.
+7. After the three frontend domains exist, update the API service `CORS_ORIGIN` to include them as a comma-separated list and redeploy the API service.
 
 ## Expected Client Links
 
@@ -55,6 +56,7 @@ Before sending links to the client:
 3. End-user mobile web demo loads on its Railway URL and Contractor/Team Member login works.
 4. Admin Mobile web demo loads on its Railway URL and OWNER/ADMIN/STAFF login works.
 5. No screen calls `http://127.0.0.1:3000/api` or `localhost` in the browser network panel.
+6. Browser API calls from the two mobile web demo URLs are not blocked by CORS.
 
 ## Notes
 
