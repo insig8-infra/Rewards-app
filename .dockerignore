@@ -16,6 +16,8 @@ node_modules
 tmp
 output
 *.png
+!apps/mobile/assets/*.png
+!apps/admin-mobile/assets/*.png
 *.jpg
 *.jpeg
 *.pdf
