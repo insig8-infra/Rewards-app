@@ -98,7 +98,7 @@ export class ItemCodesService {
   }
 
   async refreshFromBusyAdapter(actor: AuthenticatedActor, refreshedAt: Date): Promise<ItemCodeRefreshResult> {
-    assertOwner(actor);
+    assertOwnerOrAdmin(actor);
     const sourceRows = buildBusyItemCodeSources();
     const sourceCodes = [...sourceRows.keys()];
     let createdCount = 0;
@@ -350,7 +350,7 @@ export class ItemCodesService {
     actor: AuthenticatedActor,
     updatedAt: Date,
   ): Promise<AdminItemCodeView> {
-    assertOwner(actor);
+    assertOwnerOrAdmin(actor);
     const rule = validateItemCodeRewardRule(input);
     const existing = await this.prisma.itemCode.findUnique({
       where: { id: itemCodeId },
@@ -407,9 +407,9 @@ export class ItemCodesService {
   }
 }
 
-function assertOwner(actor: AuthenticatedActor): void {
-  if (actor.role !== ACTOR_ROLE.OWNER) {
-    throw new DomainError("ITEM_CODE_MANAGE_FORBIDDEN", "Only OWNER can edit ItemCode reward rules.");
+function assertOwnerOrAdmin(actor: AuthenticatedActor): void {
+  if (actor.role !== ACTOR_ROLE.OWNER && actor.role !== ACTOR_ROLE.ADMIN) {
+    throw new DomainError("ITEM_CODE_MANAGE_FORBIDDEN", "Only OWNER/Admin can edit ItemCode reward rules.");
   }
 }
 

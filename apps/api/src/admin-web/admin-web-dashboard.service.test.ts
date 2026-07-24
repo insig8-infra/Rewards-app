@@ -6,11 +6,12 @@ import type { AdminWebDashboardRepository } from "./admin-web-dashboard.reposito
 
 test("AdminWebDashboardService returns role-scoped dashboard sections", async () => {
   const service = new AdminWebDashboardService({
-    getDashboard: (actorRole) =>
+    getDashboard: (actor) =>
       Promise.resolve({
-        actorRole,
-        roleLabel: actorRole === ACTOR_ROLE.OWNER ? "Owner dashboard" : "Staff dashboard",
-        allowedSections: actorRole === ACTOR_ROLE.OWNER ? ["staff"] : ["contractors-readonly"],
+        actorRole: actor.role,
+        actorLabel: actor.userId ? `${actor.role} - ${actor.userId}` : actor.role,
+        roleLabel: actor.role === ACTOR_ROLE.OWNER ? "Owner dashboard" : actor.role === ACTOR_ROLE.ADMIN ? "Admin dashboard" : "Staff dashboard",
+        allowedSections: actor.role === ACTOR_ROLE.OWNER ? ["admins", "staff"] : actor.role === ACTOR_ROLE.ADMIN ? ["staff"] : ["contractors-readonly"],
         metrics: {
           contractors: 0,
           staff: 0,
@@ -35,9 +36,11 @@ test("AdminWebDashboardService returns role-scoped dashboard sections", async ()
       }),
   } as AdminWebDashboardRepository);
 
-  const ownerDashboard = await service.getDashboard(ACTOR_ROLE.OWNER);
-  const staffDashboard = await service.getDashboard(ACTOR_ROLE.STAFF);
+  const ownerDashboard = await service.getDashboard({ role: ACTOR_ROLE.OWNER, userId: "owner_user_1" });
+  const adminDashboard = await service.getDashboard({ role: ACTOR_ROLE.ADMIN, userId: "admin_user_1" });
+  const staffDashboard = await service.getDashboard({ role: ACTOR_ROLE.STAFF, userId: "staff_user_1" });
 
-  assert.deepEqual(ownerDashboard.allowedSections, ["staff"]);
+  assert.deepEqual(ownerDashboard.allowedSections, ["admins", "staff"]);
+  assert.deepEqual(adminDashboard.allowedSections, ["staff"]);
   assert.deepEqual(staffDashboard.allowedSections, ["contractors-readonly"]);
 });

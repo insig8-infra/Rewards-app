@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import * as QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import {
+  isAdminApiError,
   createAdminApiClient,
   type AdminInvoiceDetail,
   type AdminInvoiceSummary,
@@ -23,6 +25,14 @@ import {
 import type { AdminSessionView } from "../auth/adminSessionTypes";
 import { getQrStatusBadgeClassName, getQrStatusDisplayLabel } from "../lib/qrStatusDisplay";
 import { AdminPortalShell } from "./AdminPortalShell";
+import {
+  buildQrPrintSelections,
+  getSelectionPoints,
+  getSelectionQuantity,
+  normalizeQuantityInput,
+  type QrPrintSelectionState,
+} from "./qrPrintSelection";
+import { buildQrStickerLabels, type QrStickerLabel } from "./qrStickerSheet";
 
 const defaultMockInvoices: readonly MockInvoiceSummary[] = [
   {
@@ -54,11 +64,6 @@ interface UiLine {
   readonly lineTotal: string;
 }
 
-interface SelectionState {
-  readonly checked: boolean;
-  readonly quantity: number;
-}
-
 export function QrPrintWorkspace({
   initialInvoiceId,
   session,
@@ -82,9 +87,12 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
   const [importedInvoices, setImportedInvoices] = useState<readonly AdminInvoiceSummary[]>([]);
   const [invoiceDetail, setInvoiceDetail] = useState<AdminInvoiceDetail | null>(null);
   const [lines, setLines] = useState<readonly UiLine[]>([]);
-  const [selection, setSelection] = useState<Record<string, SelectionState>>({});
+  const [selection, setSelection] = useState<Record<string, QrPrintSelectionState>>({});
   const [printedUnits, setPrintedUnits] = useState<readonly PrintedQrUnit[]>([]);
   const [reprintedUnits, setReprintedUnits] = useState<Record<string, PrintedQrUnit>>({});
+  const [qrImageUrls, setQrImageUrls] = useState<Record<string, string>>({});
+  const [qrImageError, setQrImageError] = useState<string | null>(null);
+  const [generatingQrImages, setGeneratingQrImages] = useState(false);
   const [queueSearch, setQueueSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("ready");
   const [queueSort, setQueueSort] = useState<QueueSort>("imported-desc");
@@ -107,25 +115,88 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
     () => sortQueue(filterQueue(printableInvoices, queueSearch, queueFilter), queueSort),
     [printableInvoices, queueFilter, queueSearch, queueSort],
   );
-  const selectedCount = Object.values(selection).reduce(
-    (total, item) => total + (item.checked ? item.quantity : 0),
-    0,
-  );
+  const selectedCount = lines.reduce((total, line) => total + getSelectionQuantity(line, selection[line.invoiceLineId]), 0);
   const selectedPoints = lines.reduce((total, line) => {
     const item = selection[line.invoiceLineId];
-    return total + (item?.checked ? item.quantity * line.points : 0);
+    return total + getSelectionPoints(line, item);
   }, 0);
   const printableUnitTotal = printableInvoices.reduce((total, invoice) => total + invoice.printableUnitCount, 0);
   const returnedUnitTotal = importedInvoices.reduce((total, invoice) => total + invoice.returnedUnitCount, 0);
   const latestSyncAt = busySyncStatus.latestSyncAt;
   const printSelections = useMemo(
     () =>
-      lines.flatMap((line) => {
-        const item = selection[line.invoiceLineId];
-        return item?.checked && item.quantity > 0 ? [{ invoiceLineId: line.invoiceLineId, quantity: item.quantity }] : [];
-      }),
+      buildQrPrintSelections(lines, selection),
     [lines, selection],
   );
+  const latestBatchUnits = useMemo(
+    () => printedUnits.map((unit) => reprintedUnits[unit.qrUnitId] ?? unit),
+    [printedUnits, reprintedUnits],
+  );
+  const stickerLabels = useMemo(
+    () =>
+      invoiceDetail
+        ? buildQrStickerLabels({
+          invoiceNumber: invoiceDetail.invoiceNumber,
+          customerName: invoiceDetail.customerName,
+          units: latestBatchUnits,
+          lines,
+        })
+        : [],
+    [invoiceDetail, latestBatchUnits, lines],
+  );
+  const stickerSheetReady = stickerLabels.length > 0 && stickerLabels.every((label) => Boolean(qrImageUrls[label.qrUnitId]));
+
+  useEffect(() => {
+    let active = true;
+
+    async function generateQrImages(labels: readonly QrStickerLabel[]) {
+      if (labels.length === 0) {
+        setQrImageUrls({});
+        setQrImageError(null);
+        setGeneratingQrImages(false);
+        return;
+      }
+
+      setGeneratingQrImages(true);
+      setQrImageError(null);
+
+      try {
+        const images = await Promise.all(
+          labels.map(async (label) => {
+            const dataUrl = await QRCode.toDataURL(label.tokenValue, {
+              errorCorrectionLevel: "M",
+              margin: 1,
+              width: 168,
+              color: {
+                dark: "#111827ff",
+                light: "#ffffffff",
+              },
+            });
+            return [label.qrUnitId, dataUrl] as const;
+          }),
+        );
+
+        if (active) {
+          setQrImageUrls(Object.fromEntries(images));
+        }
+      } catch (error) {
+        if (active) {
+          setQrImageUrls({});
+          setQrImageError(error instanceof Error ? error.message : "QR image generation failed");
+        }
+      } finally {
+        if (active) {
+          setGeneratingQrImages(false);
+        }
+      }
+    }
+
+    void generateQrImages(stickerLabels);
+
+    return () => {
+      active = false;
+    };
+  }, [stickerLabels]);
 
   async function loadInvoices(selectInvoiceId?: string) {
     setLoading("invoices");
@@ -272,6 +343,15 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
     }
   }
 
+  function printStickerSheet() {
+    if (!stickerSheetReady) {
+      setStatus({ tone: "error", message: qrImageError ?? "QR sticker sheet is not ready yet." });
+      return;
+    }
+
+    window.print();
+  }
+
   function applyInvoiceDetail(detail: AdminInvoiceDetail) {
     setInvoiceDetail(detail);
 
@@ -295,7 +375,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
       Object.fromEntries(
         nextLines.map((line) => [
           line.invoiceLineId,
-          { checked: line.available > 0, quantity: line.available },
+          { checked: line.available > 0, quantityInput: String(line.available) },
         ]),
       ),
     );
@@ -360,7 +440,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
               <input
                 aria-label="Search print queue"
                 className="text-input"
-                placeholder="Search invoice, customer, GSTIN, product"
+                placeholder="Search invoice, party, item, code"
                 value={queueSearch}
                 onChange={(event) => setQueueSearch(event.target.value)}
               />
@@ -446,7 +526,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
               <div className="panel-empty compact">No invoice selected</div>
             ) : (
               lines.map((line) => {
-                const item = selection[line.invoiceLineId] ?? { checked: false, quantity: 0 };
+                const item = selection[line.invoiceLineId] ?? { checked: false, quantityInput: "0" };
                 return (
                   <div className="line-row" key={line.invoiceLineId}>
                     <input
@@ -461,6 +541,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
                           [line.invoiceLineId]: {
                             ...item,
                             checked: event.target.checked,
+                            quantityInput: event.target.checked ? normalizeQuantityInput(item.quantityInput, line.available) : item.quantityInput,
                           },
                         }))
                       }
@@ -481,13 +562,22 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
                       max={line.available}
                       min={line.available > 0 ? 1 : 0}
                       type="number"
-                      value={item.quantity}
+                      value={item.quantityInput}
                       onChange={(event) =>
                         setSelection((current) => ({
                           ...current,
                           [line.invoiceLineId]: {
                             ...item,
-                            quantity: clamp(Number(event.target.value), line.available > 0 ? 1 : 0, line.available),
+                            quantityInput: event.target.value,
+                          },
+                        }))
+                      }
+                      onBlur={() =>
+                        setSelection((current) => ({
+                          ...current,
+                          [line.invoiceLineId]: {
+                            ...(current[line.invoiceLineId] ?? item),
+                            quantityInput: normalizeQuantityInput((current[line.invoiceLineId] ?? item).quantityInput, line.available),
                           },
                         }))
                       }
@@ -500,7 +590,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
 
           <div className="actions">
             <span className={status.tone === "success" ? "status success" : status.tone === "error" ? "status error" : "status"}>
-              {invoiceDetail ? `${selectedPoints} points in batch` : status.message}
+              {status.tone === "error" || !invoiceDetail ? status.message : `${selectedPoints} points in batch`}
             </span>
             <button
               className="button primary"
@@ -519,9 +609,20 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
         <div className="panel-header">
           <div>
             <h2 className="panel-title">Latest print batch</h2>
-            <div className="panel-subtitle">Raw QR tokens are shown once after print</div>
+            <div className="panel-subtitle">QR stickers are generated in this browser session only</div>
           </div>
-          <span className="badge">{printedUnits.length} units</span>
+          <div className="toolbar no-print">
+            <span className="badge">{latestBatchUnits.length} units</span>
+            <button
+              className="button compact"
+              type="button"
+              onClick={printStickerSheet}
+              disabled={latestBatchUnits.length === 0 || generatingQrImages || Boolean(qrImageError)}
+            >
+              {generatingQrImages ? <Loader2 size={14} aria-hidden="true" /> : <Printer size={14} aria-hidden="true" />}
+              Print stickers
+            </button>
+          </div>
         </div>
         <div className="print-list">
           {printedUnits.length === 0 ? (
@@ -530,7 +631,7 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
             printedUnits.map((unit) => (
               <div className="print-row" key={unit.qrUnitId}>
                 <strong>Unit {unit.unitIndex}</strong>
-                <span className="qr-label-copy">Collect {reprintedUnits[unit.qrUnitId]?.points ?? unit.points} points</span>
+                <span className="qr-label-copy">Get {reprintedUnits[unit.qrUnitId]?.points ?? unit.points} Points</span>
                 <span className={getQrStatusBadgeClassName(reprintedUnits[unit.qrUnitId] ? "REPRINTED" : "PRINTED_UNCLAIMED")}>
                   {getQrStatusDisplayLabel(reprintedUnits[unit.qrUnitId] ? "REPRINTED" : "PRINTED_UNCLAIMED")}
                 </span>
@@ -543,6 +644,25 @@ function QrPrintContent({ initialInvoiceId }: { readonly initialInvoiceId?: stri
             ))
           )}
         </div>
+        {qrImageError ? <div className="status error sticker-status">{qrImageError}</div> : null}
+        {stickerLabels.length > 0 ? (
+          <div className="sticker-sheet printable-sticker-sheet" aria-label="Printable QR sticker sheet">
+            {stickerLabels.map((label) => (
+              <article className="sticker-label" key={label.qrUnitId}>
+                <div className="sticker-qr">
+                  {qrImageUrls[label.qrUnitId] ? (
+                    <img alt={`QR for ${label.unitLabel}`} src={qrImageUrls[label.qrUnitId]} />
+                  ) : (
+                    <span>{generatingQrImages ? "Generating" : "QR unavailable"}</span>
+                  )}
+                </div>
+                <div className="sticker-copy">
+                  <strong>{label.pointsLabel}</strong>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </section>
     </section>
   );
@@ -594,8 +714,8 @@ function filterQueue(
 
     return [
       invoice.invoiceNumber,
+      invoice.externalInvoiceId,
       invoice.customerName,
-      invoice.customerGstin ?? "",
       invoice.productSummary,
       invoice.categorySummary,
     ]
@@ -623,14 +743,11 @@ function sortQueue(invoices: readonly AdminInvoiceSummary[], sort: QueueSort): r
   });
 }
 
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-}
-
 function getErrorMessage(error: unknown): string {
+  if (isAdminApiError(error) && error.code === "ITEM_CODE_NOT_FOUND_FOR_PRINT") {
+    return "ItemCode must be synced before QR print. Open Item Codes, sync BUSY items, then retry this invoice.";
+  }
+
   return error instanceof Error ? error.message : "Request failed";
 }
 

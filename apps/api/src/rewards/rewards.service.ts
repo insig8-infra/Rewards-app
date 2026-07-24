@@ -768,7 +768,10 @@ export class RewardsService {
 
   async listAdminClaims(_actor: AuthenticatedActor): Promise<readonly AdminRewardClaimLookup[]> {
     const claims = await this.prisma.rewardClaim.findMany({
-      where: { status: "CHOSEN" },
+      where: {
+        status: "CHOSEN",
+        claimId: { not: staleMockClaimId },
+      },
       include: {
         rewardItem: true,
         contractor: {
@@ -876,12 +879,12 @@ export class RewardsService {
     surface: AdminRewardSurface = "ADMIN_WEB",
   ): Promise<AdminRewardClaimLookup> {
     if (!actor.userId) {
-      throw new UnauthorizedException("OWNER user id is required.");
+      throw new UnauthorizedException("Admin actor user id is required.");
     }
     if (!input.challengeId || !input.otp) {
       throw new BadRequestException("OTP challenge id and code are required.");
     }
-    const ownerUserId = actor.userId;
+    const actorUserId = actor.userId;
     const challengeId = input.challengeId;
     const otp = input.otp;
     assertOtpOrBadRequest(otp);
@@ -931,7 +934,7 @@ export class RewardsService {
           data: {
             status: "FULFILLED",
             fulfilledAt: now,
-            fulfilledByOwnerId: ownerUserId,
+            fulfilledByOwnerId: actorUserId,
             otpVerifiedAt: now,
           },
           include: {
@@ -950,7 +953,7 @@ export class RewardsService {
             sourceId: claim.id,
             rewardClaimId: claim.id,
             idempotencyKey: `reward-fulfill:${claim.id}`,
-            createdByUserId: ownerUserId,
+            createdByUserId: actorUserId,
             createdAt: now,
           },
         });
@@ -958,7 +961,7 @@ export class RewardsService {
         await tx.auditEvent.create({
           data: {
             actorRole: actor.role,
-            actorUserId: ownerUserId,
+            actorUserId,
             surface,
             action: "REWARD_FULFILLED",
             targetType: "REWARD_CLAIM",

@@ -1,9 +1,17 @@
-import { createElement, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNetInfo } from "@react-native-community/netinfo";
+import { Feather, type FeatherIconName } from "@react-native-vector-icons/feather";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
+import * as Font from "expo-font";
+import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
+  Animated,
+  type ColorValue,
+  Easing,
   Image,
   Platform,
   Pressable,
@@ -13,6 +21,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
@@ -77,7 +86,12 @@ import {
   type StoredSession,
 } from "./src/storage";
 import { presentBalanceBook, type BalanceBookFilter, type BalanceBookSort } from "./src/balanceBookPresentation";
+import { normalizeQrScannerData, shouldAcceptQrScannerData } from "./src/qrScanner";
 import { statusTone, theme, type StatusTone } from "./src/theme";
+import { isLocalDevPromotionAsset } from "./src/promotionPresentation";
+import { isOfflineNetworkState, NO_INTERNET_MESSAGE } from "./src/offline";
+
+declare const require: (path: string) => number;
 
 type Persona = "CONTRACTOR" | "TEAM_MEMBER";
 type ViewKey = "home" | "scan" | "sites" | "history" | "rewards";
@@ -106,6 +120,8 @@ const ContractorTabs = createBottomTabNavigator();
 const TeamMemberStack = createNativeStackNavigator();
 const TeamMemberTabs = createBottomTabNavigator();
 const isWebRuntime = Platform.OS === "web";
+const allowedProfilePhotoContentTypes = new Set(["image/jpeg", "image/png"]);
+const maxProfilePhotoBytes = 2_000_000;
 
 const emptySiteForm: SiteInput = {
   clientName: "",
@@ -117,6 +133,7 @@ const emptySiteForm: SiteInput = {
 
 export default function App() {
   useWebDocumentReset();
+  useFeatherFontReady();
 
   const [language, setLanguage] = useState<Language>("en");
   const [persona, setPersona] = useState<Persona>("CONTRACTOR");
@@ -131,6 +148,8 @@ export default function App() {
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const netInfo = useNetInfo();
+  const isOffline = isOfflineNetworkState(netInfo);
 
   const tr = (key: CopyKey) => t(language, key);
 
@@ -284,6 +303,7 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primaryDark} />
       <View style={styles.app}>
+        {isOffline ? <OfflineBanner /> : null}
         <NavigationContainer>
           {!session ? (
             <AuthNavigator
@@ -356,6 +376,35 @@ export default function App() {
   return appShell;
 }
 
+function useFeatherFontReady(): void {
+  const [, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    Font.loadAsync({
+      Feather: require("@react-native-vector-icons/feather/fonts/Feather.ttf"),
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) {
+          setReady(true);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+}
+
+function OfflineBanner() {
+  return (
+    <View accessibilityRole="alert" style={styles.offlineBanner}>
+      <Text style={styles.offlineBannerText}>{NO_INTERNET_MESSAGE}</Text>
+    </View>
+  );
+}
+
 function useWebDocumentReset(): void {
   useEffect(() => {
     if (!isWebRuntime || typeof document === "undefined") {
@@ -387,7 +436,7 @@ function useWebDocumentReset(): void {
       #root {
         display: flex;
         flex-direction: column;
-        max-width: 480px;
+        max-width: ${theme.layout.maxPhonePreviewWidth}px;
         margin: 0 auto;
         background: #F4F7F7;
       }
@@ -443,7 +492,7 @@ function AuthScreen(props: {
     <>
       <Header language={props.language} onSwitchLanguage={props.onSwitchLanguage} title={props.tr("appName")} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.screenContentInset}>
+        <ScreenContentInset>
           <AuthWelcome tr={props.tr} persona={props.persona} />
           <PersonaSelector persona={props.persona} setPersona={props.setPersona} tr={props.tr} />
           {props.persona === "CONTRACTOR" ? (
@@ -476,7 +525,7 @@ function AuthScreen(props: {
               runTask={props.runTask}
             />
           )}
-        </View>
+        </ScreenContentInset>
       </ScrollView>
     </>
   );
@@ -919,7 +968,7 @@ function TopLevelScreen(props: {
     <>
       <Header language={props.language} onSwitchLanguage={props.onSwitchLanguage} title={props.tr("appName")} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.screenContentInset}>{props.children}</View>
+        <ScreenContentInset>{props.children}</ScreenContentInset>
       </ScrollView>
     </>
   );
@@ -928,9 +977,17 @@ function TopLevelScreen(props: {
 function StackScroll(props: { readonly children: ReactNode }) {
   return (
     <ScrollView contentContainerStyle={styles.stackScrollContent}>
-      <View style={styles.screenContentInset}>{props.children}</View>
+      <ScreenContentInset>{props.children}</ScreenContentInset>
     </ScrollView>
   );
+}
+
+function ScreenContentInset(props: { readonly children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const maxShellWidth = isWebRuntime ? theme.layout.maxPhonePreviewWidth : width;
+  const boundedWidth = Math.max(0, Math.min(width, maxShellWidth));
+
+  return <View style={[styles.screenContentInset, { maxWidth: boundedWidth, width: boundedWidth }]}>{props.children}</View>;
 }
 
 const stackScreenOptions = {
@@ -960,46 +1017,10 @@ function tabScreenOptions(routeName: string, tr: (key: CopyKey) => string) {
 
 function TabGlyph(props: { readonly focused: boolean; readonly routeName: string }) {
   const active = props.focused;
-  const lineStyle = active ? styles.tabGlyphLineActive : styles.tabGlyphLine;
-
-  if (props.routeName === "Scan") {
-    return (
-      <View style={[styles.navTabIcon, active ? styles.navTabIconActive : undefined]}>
-        <View style={styles.tabGlyphGrid}>
-          {[0, 1, 2, 3].map((cell) => (
-            <View key={cell} style={[styles.tabGlyphQrCell, active ? styles.tabGlyphQrCellActive : undefined]} />
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (props.routeName === "History") {
-    return (
-      <View style={[styles.navTabIcon, active ? styles.navTabIconActive : undefined]}>
-        <View style={[styles.tabGlyphClock, lineStyle]}>
-          <View style={[styles.tabGlyphClockHandVertical, lineStyle]} />
-          <View style={[styles.tabGlyphClockHandHorizontal, lineStyle]} />
-        </View>
-      </View>
-    );
-  }
-
-  if (props.routeName === "Rewards") {
-    return (
-      <View style={[styles.navTabIcon, active ? styles.navTabIconActive : undefined]}>
-        <View style={[styles.tabGlyphGiftLid, lineStyle]} />
-        <View style={[styles.tabGlyphGiftBox, lineStyle]}>
-          <View style={[styles.tabGlyphGiftRibbon, active ? styles.tabGlyphRibbonActive : undefined]} />
-        </View>
-      </View>
-    );
-  }
-
+  const color = active ? theme.colors.primary : theme.colors.muted;
   return (
     <View style={[styles.navTabIcon, active ? styles.navTabIconActive : undefined]}>
-      <View style={[styles.tabGlyphHomeRoof, active ? styles.tabGlyphHomeRoofActive : undefined]} />
-      <View style={[styles.tabGlyphHomeBody, lineStyle]} />
+      <Feather name={tabIconName(props.routeName)} color={color} size={22} />
     </View>
   );
 }
@@ -1351,23 +1372,22 @@ function DashboardView(props: {
 
       <PromotionBannerCard promotion={props.promotion} />
 
-      <View style={styles.dashboardMetricGrid}>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.pointsCard, pressed ? styles.pressed : undefined]} onPress={props.onBalanceBook}>
-          <Text numberOfLines={1} style={styles.metricCardLabel}>{props.tr("pointsAvailable")}</Text>
-          <Text style={styles.pointsValue}>{props.session.contractor.availablePoints.toLocaleString("en-IN")}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.pointsCard, pressed ? styles.pressed : undefined]} onPress={props.onRewards}>
-          <Text numberOfLines={1} style={styles.metricCardLabel}>{props.tr("lifetimeCollected")}</Text>
-          <Text style={styles.metricCardValue}>{totalEarned.toLocaleString("en-IN")}</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${milestoneProgress * 100}%` }]} />
-          </View>
-          <Text numberOfLines={1} style={styles.rewardGap}>{props.tr("nextMilestone")}: {nextMilestone.toLocaleString("en-IN")}</Text>
-        </Pressable>
-      </View>
+      <ContractorWalletCard
+        availablePoints={props.session.contractor.availablePoints}
+        currentTier={props.session.contractor.tier ?? "Silver"}
+        milestoneProgress={milestoneProgress}
+        nextMilestone={nextMilestone}
+        onBalanceBook={props.onBalanceBook}
+        onRewards={props.onRewards}
+        totalEarned={totalEarned}
+        tr={props.tr}
+      />
 
       <Pressable accessibilityRole="button" style={({ pressed }) => [styles.selectedSiteStrip, pressed ? styles.pressed : undefined]} onPress={props.onSites}>
-        <Text style={styles.overline}>{props.tr("selectedSiteManage")}</Text>
+        <View style={styles.selectedSiteHeader}>
+          <Text style={styles.overline}>{props.tr("selectedSiteManage")}</Text>
+          <StatusBadge label={selectedSite ? props.tr("selected") : props.tr("selectSite")} tone={selectedSite ? "success" : "warning"} />
+        </View>
         <Text numberOfLines={2} style={styles.selectedSiteTitle}>{selectedSite ? siteLabel(selectedSite) : props.tr("noSite")}</Text>
         <Text numberOfLines={2} style={styles.mutedText}>{props.tr("dashboardPrompt")}</Text>
       </Pressable>
@@ -1409,6 +1429,54 @@ function DashboardView(props: {
         />
       </Panel>
     </>
+  );
+}
+
+function ContractorWalletCard(props: {
+  readonly availablePoints: number;
+  readonly currentTier: string;
+  readonly milestoneProgress: number;
+  readonly nextMilestone: number;
+  readonly onBalanceBook: () => void;
+  readonly onRewards: () => void;
+  readonly totalEarned: number;
+  readonly tr: (key: CopyKey) => string;
+}) {
+  return (
+    <View style={styles.walletCard}>
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.walletPrimaryRow, pressed ? styles.pressed : undefined]}
+        onPress={props.onBalanceBook}
+      >
+        <View style={styles.walletPrimaryCopy}>
+          <Text numberOfLines={1} style={styles.walletOverline}>{props.tr("pointsAvailable")}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72} style={styles.walletValue}>
+            {props.availablePoints.toLocaleString("en-IN")}
+          </Text>
+          <Text numberOfLines={1} style={styles.walletSubtext}>{props.tr("pointsAvailableSuffix")}</Text>
+        </View>
+        <View style={styles.walletTierBadge}>
+          <Text numberOfLines={1} style={styles.walletTierText}>{props.currentTier}</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.walletProgressPanel, pressed ? styles.pressed : undefined]}
+        onPress={props.onRewards}
+      >
+        <View style={styles.walletProgressHeader}>
+          <Text numberOfLines={1} style={styles.walletProgressLabel}>{props.tr("lifetimeCollected")}</Text>
+          <Text numberOfLines={1} style={styles.walletProgressValue}>{props.totalEarned.toLocaleString("en-IN")}</Text>
+        </View>
+        <View style={styles.walletProgressTrack}>
+          <View style={[styles.walletProgressFill, { width: `${props.milestoneProgress * 100}%` }]} />
+        </View>
+        <Text numberOfLines={1} style={styles.walletSubtext}>
+          {props.tr("nextMilestone")}: {props.nextMilestone.toLocaleString("en-IN")} {props.tr("points")}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1471,15 +1539,23 @@ function ProfileView(props: {
   return (
     <>
       <Panel title={props.tr("profile")}>
-        <View style={styles.profileHeader}>
-          <ContractorAvatar large name={props.session.contractor.name} photoUrl={photoDraft || props.session.contractor.photoUrl} />
-          <View style={styles.identityCopy}>
-            <Text style={styles.cardTitle}>{props.session.contractor.name}</Text>
-            <Text style={styles.mutedText}>{props.session.contractor.mobileNumber}</Text>
-            <Text style={styles.mutedText}>{props.session.contractor.tier ?? "Silver"}</Text>
+        <View style={styles.profileHeroCard}>
+          <View style={styles.profileHeroTop}>
+            <ContractorAvatar large name={props.session.contractor.name} photoUrl={photoDraft || props.session.contractor.photoUrl} />
+            <View style={styles.profileHeroCopy}>
+              <Text style={styles.profileHeroOverline}>{props.tr("profileOverview")}</Text>
+              <Text numberOfLines={2} style={styles.profileHeroName}>{props.session.contractor.name}</Text>
+              <Text style={styles.profileHeroMobile}>{props.session.contractor.mobileNumber}</Text>
+            </View>
+            <StatusBadge label={props.session.contractor.tier ?? "Silver"} tone="warning" />
+          </View>
+          <View style={styles.lightMetricRow}>
+            <LightMetric label={props.tr("pointsAvailable")} value={props.session.contractor.availablePoints.toLocaleString("en-IN")} />
+            <LightMetric label={props.tr("lifetimeCollected")} value={props.session.contractor.totalAccumulatedPoints.toLocaleString("en-IN")} />
           </View>
         </View>
         <ProfilePhotoControls
+          contractorName={props.session.contractor.name}
           currentPhotoUrl={props.session.contractor.photoUrl ?? ""}
           disabled={photoBusy}
           draftPhotoUrl={photoDraft}
@@ -1488,13 +1564,14 @@ function ProfileView(props: {
           onSave={() => void saveProfilePhoto()}
           tr={props.tr}
         />
-        <View style={styles.rowActions}>
+        <View style={styles.profileActionGrid}>
           <SecondaryButton label={props.tr("helpSupport")} onPress={() => setMessage(props.tr("supportMessage"))} />
           <SecondaryButton label={props.tr("about")} onPress={() => setMessage(props.tr("storeReadyNote"))} />
         </View>
         {message ? <Text style={styles.helperText}>{message}</Text> : null}
       </Panel>
       <Panel title={props.tr("changeMpin")}>
+        <Text style={styles.helperText}>{props.tr("secureAccessBody")}</Text>
         <Field label={props.tr("oldMpin")} value={oldMpin} onChangeText={setOldMpin} keyboardType="number-pad" secureTextEntry revealLabel={props.tr("show")} hideLabel={props.tr("hide")} />
         <Field label={props.tr("newMpin")} value={newMpin} onChangeText={setNewMpin} keyboardType="number-pad" secureTextEntry revealLabel={props.tr("show")} hideLabel={props.tr("hide")} />
         <Field label={props.tr("confirmMpin")} value={confirmMpin} onChangeText={setConfirmMpin} keyboardType="number-pad" secureTextEntry revealLabel={props.tr("show")} hideLabel={props.tr("hide")} />
@@ -1508,6 +1585,7 @@ function ProfileView(props: {
 }
 
 function ProfilePhotoControls(props: {
+  readonly contractorName: string;
   readonly currentPhotoUrl: string;
   readonly disabled: boolean;
   readonly draftPhotoUrl: string;
@@ -1547,6 +1625,49 @@ function ProfilePhotoControls(props: {
     }
   }
 
+  async function handleNativeChoosePhoto(): Promise<void> {
+    setFileMessage("");
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setFileMessage(props.tr("profilePhotoPermissionError"));
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: false,
+        base64: true,
+        quality: 0.72,
+      });
+      if (result.canceled) {
+        setFileMessage(props.tr("profilePhotoPickCancelled"));
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64) {
+        setFileMessage(props.tr("profilePhotoReadError"));
+        return;
+      }
+
+      const contentType = asset.mimeType ?? inferProfilePhotoContentType(asset.fileName ?? asset.uri);
+      if (!allowedProfilePhotoContentTypes.has(contentType)) {
+        setFileMessage(props.tr("profilePhotoTypeError"));
+        return;
+      }
+      if (base64ByteLength(asset.base64) > maxProfilePhotoBytes) {
+        setFileMessage(props.tr("profilePhotoSizeError"));
+        return;
+      }
+
+      props.onChange(`data:${contentType};base64,${asset.base64}`);
+      setFileMessage(props.tr("profilePhotoReady"));
+    } catch {
+      setFileMessage(props.tr("profilePhotoReadError"));
+    }
+  }
+
   return (
     <View style={styles.profilePhotoPanel}>
       <View style={styles.profilePhotoHeader}>
@@ -1555,6 +1676,13 @@ function ProfilePhotoControls(props: {
           <Text style={styles.mutedText}>{props.tr("profilePhotoHint")}</Text>
         </View>
         {hasPhoto ? <StatusBadge label={props.tr("active")} tone="success" /> : <StatusBadge label={props.tr("notSelected")} tone="muted" />}
+      </View>
+      <View style={styles.profilePhotoPreviewRow}>
+        <ContractorAvatar name={props.contractorName} photoUrl={props.draftPhotoUrl || props.currentPhotoUrl} />
+        <View style={styles.profilePhotoPreviewCopy}>
+          <Text style={styles.cardTitle}>{hasPhoto ? props.tr("photoOnFile") : props.tr("photoNotSet")}</Text>
+          <Text style={styles.mutedText}>{Platform.OS === "web" ? props.tr("profilePhotoHint") : props.tr("profilePhotoNativeHint")}</Text>
+        </View>
       </View>
       {Platform.OS === "web" ? (
         createElement("input", {
@@ -1568,8 +1696,9 @@ function ProfilePhotoControls(props: {
           type: "file",
         })
       ) : (
-        <Text style={styles.helperText}>{props.tr("nativeProfilePhotoPending")}</Text>
+        <PrimaryButton disabled={props.disabled} label={props.tr("chooseProfilePhoto")} onPress={() => void handleNativeChoosePhoto()} />
       )}
+      {Platform.OS !== "web" ? <Text style={styles.mutedText}>{props.tr("nativeProfilePhotoPending")}</Text> : null}
       {fileMessage ? <Text style={styles.helperText}>{fileMessage}</Text> : null}
       <View style={styles.rowActions}>
         <PrimaryButton
@@ -1623,25 +1752,29 @@ function TeamMemberLanding(props: {
 }) {
   return (
     <View style={styles.teamLanding}>
-      <View style={styles.summaryTop}>
+      <View style={styles.teamLandingTop}>
         <View style={styles.identityRow}>
           <ContractorAvatar name={props.session.contractor.name} photoUrl={props.session.contractor.photoUrl} />
           <View style={styles.identityCopy}>
-            <Text style={styles.overline}>{props.tr("teamContractorContext")}</Text>
-            <Text style={styles.summaryName}>{props.session.contractor.name}</Text>
-            <Text style={styles.summaryMobile}>{props.session.contractor.mobileNumber}</Text>
+            <Text style={styles.teamLandingOverline}>{props.tr("teamContractorContext")}</Text>
+            <Text style={styles.teamLandingName}>{props.session.contractor.name}</Text>
+            <Text style={styles.teamLandingMobile}>{props.session.contractor.mobileNumber}</Text>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={props.onLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>{props.tr("logout")}</Text>
-        </Pressable>
+        <StatusBadge label={props.tr("active")} tone="success" />
       </View>
+      <Text style={styles.teamLandingNote}>{props.tr("teamSessionNote")}</Text>
       <View style={styles.teamSiteBox}>
-        <Text style={styles.overline}>{props.tr("selectedSiteManage")}</Text>
+        <View style={styles.selectedSiteHeader}>
+          <Text style={styles.overline}>{props.tr("selectedSiteManage")}</Text>
+          <StatusBadge label={props.activeSite ? props.tr("selected") : props.tr("selectSite")} tone={props.activeSite ? "success" : "warning"} />
+        </View>
         <Text style={styles.cardTitle}>{props.activeSite ? siteLabel(props.activeSite) : props.tr("noSite")}</Text>
-        <Text style={styles.mutedText}>{props.tr("teamSessionNote")}</Text>
       </View>
       <PromotionBannerCard promotion={props.promotion} compact />
+      <Pressable accessibilityRole="button" onPress={props.onLogout} style={styles.teamLogoutButton}>
+        <Text style={styles.teamLogoutText}>{props.tr("logout")}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -1659,32 +1792,109 @@ function PromotionBannerCard({
   const title = promotion.overlayText || promotion.title;
   const fontWeight = promotion.overlayFontStyle === "regular" || promotion.overlayFontStyle === "italic" ? "700" : "900";
   const fontStyle = promotion.overlayFontStyle === "italic" || promotion.overlayFontStyle === "boldItalic" ? "italic" : "normal";
+  const shouldRenderAsset = Boolean(promotion.assetUrl && !isLocalDevPromotionAsset(promotion.assetUrl));
   return (
     <View style={[styles.promoBanner, compact ? styles.promoBannerCompact : undefined]}>
       <View style={styles.promoCopyBlock}>
-        <Text
-          numberOfLines={promotion.marqueeEnabled || compact ? 1 : 2}
-          style={[
-            styles.promoTitle,
-            {
-              color: promotion.overlayTextColor,
-              fontSize: Math.min(compact ? 20 : 24, Math.max(16, promotion.overlayFontSize)),
-              fontStyle,
-              fontWeight,
-            },
-          ]}
-        >
-          {title}
-        </Text>
+        <View style={styles.promoTitleRow}>
+          <View style={[styles.promoAccentBar, { backgroundColor: promotion.overlayTextColor }]} />
+          <PromotionTitle
+            compact={compact}
+            fontSize={Math.min(compact ? 20 : 24, Math.max(16, promotion.overlayFontSize))}
+            fontStyle={fontStyle}
+            fontWeight={fontWeight}
+            marquee={promotion.marqueeEnabled}
+            title={title}
+          />
+        </View>
         <Text numberOfLines={compact ? 2 : 3} style={styles.promoBody}>{promotion.body}</Text>
       </View>
-      {promotion.assetUrl ? (
+      {shouldRenderAsset ? (
         <Image
           accessibilityIgnoresInvertColors
           source={{ uri: promotion.assetUrl }}
           style={[styles.promoImage, compact ? styles.promoImageCompact : undefined]}
         />
-      ) : null}
+      ) : (
+        <View style={[styles.promoMediaFallback, compact ? styles.promoMediaFallbackCompact : undefined]}>
+          <Text style={styles.promoMediaFallbackText}>Volt Rewards Offer</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function PromotionTitle({
+  compact,
+  fontSize,
+  fontStyle,
+  fontWeight,
+  marquee,
+  title,
+}: {
+  readonly compact: boolean;
+  readonly fontSize: number;
+  readonly fontStyle: "italic" | "normal";
+  readonly fontWeight: "700" | "900";
+  readonly marquee: boolean;
+  readonly title: string;
+}) {
+  const offset = useRef(new Animated.Value(0)).current;
+  const titleStyle = [
+    styles.promoTitle,
+    {
+      fontSize,
+      fontStyle,
+      fontWeight,
+    },
+  ];
+
+  useEffect(() => {
+    if (!marquee || compact || title.length < 18) {
+      offset.stopAnimation();
+      offset.setValue(0);
+      return;
+    }
+
+    offset.setValue(0);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.delay(600),
+        Animated.timing(offset, {
+          toValue: 1,
+          duration: 8500,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [compact, marquee, offset, title]);
+
+  if (!marquee || compact || title.length < 18) {
+    return (
+      <Text numberOfLines={compact ? 1 : 2} style={titleStyle}>
+        {title}
+      </Text>
+    );
+  }
+
+  const translateX = offset.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -180],
+  });
+
+  return (
+    <View accessibilityLabel={title} style={styles.promoMarqueeViewport}>
+      <Animated.View style={[styles.promoMarqueeTrack, { transform: [{ translateX }] }]}>
+        <Text numberOfLines={1} style={[titleStyle, styles.promoMarqueeText]}>
+          {title}
+        </Text>
+        <Text numberOfLines={1} style={[titleStyle, styles.promoMarqueeText]}>
+          {title}
+        </Text>
+      </Animated.View>
     </View>
   );
 }
@@ -1742,13 +1952,13 @@ function ScanView(props: {
     };
   }, [props.activeSite?.siteId, props.session.token]);
 
-  async function submitScan(): Promise<void> {
+  async function submitScan(scannedToken?: string): Promise<void> {
     await props.runTask(async () => {
       try {
         if (!props.activeSite) {
           throw new Error(props.tr("noSite"));
         }
-        const trimmedToken = qrToken.trim();
+        const trimmedToken = normalizeQrScannerData(scannedToken ?? qrToken);
         if (!trimmedToken) {
           throw new Error(props.tr("invalidQrBody"));
         }
@@ -1825,6 +2035,9 @@ function ScanView(props: {
             <Text style={styles.scanIdentityMeta}>{props.activeSite ? siteLabel(props.activeSite) : props.tr("noSite")}</Text>
           </View>
         </View>
+        <View style={styles.scanContextStatusRow}>
+          <StatusBadge label={props.activeSite ? props.tr("selected") : props.tr("selectSite")} tone={props.activeSite ? "success" : "warning"} />
+        </View>
       </View>
       {canScan ? (
         <View style={styles.scanTargetCard}>
@@ -1837,36 +2050,93 @@ function ScanView(props: {
           </View>
         </View>
       ) : null}
-      {devFeatures.allowManualQrEntry ? (
-        <>
-          {canScan ? (
-            <>
-              <Field label={props.tr("qrToken")} value={qrToken} onChangeText={setQrToken} autoCapitalize="none" />
-              <PrimaryButton label={props.tr("submitScan")} onPress={submitScan} disabled={!qrToken.trim()} />
-            </>
-          ) : (
-            <View style={styles.cameraOnlyNotice}>
-              <Text style={styles.cameraOnlyText}>{isTeamMemberWithoutSites ? props.tr("teamMemberNoSitesShort") : props.tr("selectSiteBeforeScan")}</Text>
-            </View>
-          )}
-          <ScanCartCard
-            cart={scanCart}
-            showPoints={shouldShowScanPoints(props.session.role)}
-            tr={props.tr}
-            onCommit={submitCartCommit}
-          />
-        </>
-      ) : canScan ? (
-        <View style={styles.cameraOnlyNotice}>
-          <Text style={styles.cameraOnlyText}>{props.tr("cameraScanOnly")}</Text>
-        </View>
+      {canScan ? (
+        <QrCameraScanner
+          disabled={false}
+          onScanned={(token) => submitScan(token)}
+          tr={props.tr}
+        />
       ) : (
         <View style={styles.cameraOnlyNotice}>
           <Text style={styles.cameraOnlyText}>{isTeamMemberWithoutSites ? props.tr("teamMemberNoSitesShort") : props.tr("selectSiteBeforeScan")}</Text>
         </View>
       )}
+      {devFeatures.allowManualQrEntry && canScan ? (
+        <View style={styles.manualScanFallback}>
+          <Text style={styles.manualScanTitle}>{props.tr("manualScanFallback")}</Text>
+          <Field label={props.tr("qrToken")} value={qrToken} onChangeText={setQrToken} autoCapitalize="none" />
+          <PrimaryButton label={props.tr("submitScan")} onPress={() => void submitScan()} disabled={!qrToken.trim()} />
+        </View>
+      ) : null}
+      <ScanCartCard
+        cart={scanCart}
+        showPoints={shouldShowScanPoints(props.session.role)}
+        tr={props.tr}
+        onCommit={submitCartCommit}
+      />
     </Panel>
     </>
+  );
+}
+
+function QrCameraScanner(props: {
+  readonly disabled: boolean;
+  readonly onScanned: (token: string) => Promise<void>;
+  readonly tr: (key: CopyKey) => string;
+}) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [busy, setBusy] = useState(false);
+  const [lastAcceptedData, setLastAcceptedData] = useState("");
+
+  async function handleBarcodeScanned(result: BarcodeScanningResult): Promise<void> {
+    if (props.disabled || busy || !shouldAcceptQrScannerData(result.data, lastAcceptedData)) {
+      return;
+    }
+    const token = normalizeQrScannerData(result.data);
+    setLastAcceptedData(token);
+    setBusy(true);
+    try {
+      await props.onScanned(token);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!permission) {
+    return (
+      <View style={styles.cameraOnlyNotice}>
+        <Text style={styles.cameraOnlyText}>{props.tr("openingCameraScanner")}</Text>
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.cameraPermissionCard}>
+        <Text style={styles.cardTitle}>{props.tr("cameraPermissionTitle")}</Text>
+        <Text style={styles.mutedText}>{props.tr("cameraPermissionBody")}</Text>
+        <PrimaryButton label={props.tr("allowCamera")} onPress={() => void requestPermission()} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.cameraScannerCard}>
+      <View style={styles.cameraPreviewShell}>
+        <CameraView
+          active={!props.disabled && !busy}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          facing="back"
+          onBarcodeScanned={!props.disabled && !busy ? (result) => void handleBarcodeScanned(result) : undefined}
+          style={styles.cameraPreview}
+        />
+        <View pointerEvents="none" style={styles.cameraOverlay}>
+          <View style={styles.cameraFrame} />
+        </View>
+      </View>
+      <Text style={styles.cameraScannerTitle}>{busy ? props.tr("checkingQr") : props.tr("cameraScannerReady")}</Text>
+      <Text style={styles.cameraScannerHint}>{props.tr("cameraScannerHint")}</Text>
+    </View>
   );
 }
 
@@ -1899,8 +2169,8 @@ function ScanCartCard(props: {
         <StatusBadge label={props.tr("reservedInCart")} tone="warning" />
       </View>
       <View style={styles.scanCartMetricRow}>
-        <Metric label={props.tr("scans")} value={String(reservedItems.length)} />
-        {props.showPoints ? <Metric label={props.tr("pointsInCart")} value={totalReservedScanCartPoints(reservedItems).toLocaleString("en-IN")} emphasis /> : null}
+        <LightMetric label={props.tr("scans")} value={String(reservedItems.length)} />
+        {props.showPoints ? <LightMetric label={props.tr("pointsInCart")} value={totalReservedScanCartPoints(reservedItems).toLocaleString("en-IN")} emphasis /> : null}
       </View>
       <PrimaryButton label={props.tr("addToAccount")} onPress={props.onCommit} />
       {copyNotice ? <Text style={styles.successNotice}>{copyNotice}</Text> : null}
@@ -1914,8 +2184,8 @@ function ScanCartCard(props: {
             <StatusBadge label={props.tr("readyToAdd")} tone="warning" />
           </View>
           <View style={styles.scanCartMetricRow}>
-            {props.showPoints ? <Metric label={props.tr("qrValue")} value={`+${item.qrValuePoints}`} emphasis /> : null}
-            <Metric label={props.tr("creditedPoints")} value={props.showPoints ? "0" : "-"} />
+            {props.showPoints ? <LightMetric label={props.tr("qrValue")} value={`+${item.qrValuePoints}`} emphasis /> : null}
+            <LightMetric label={props.tr("creditedPoints")} value={props.showPoints ? "0" : "-"} />
           </View>
           <CopyValue
             label={props.tr("qrUnit")}
@@ -2010,7 +2280,9 @@ function ScanResultPanel(props: {
   if (!props.result) {
     return (
       <View style={styles.scanResultPanel}>
+        <StateGlyph tone="danger" />
         <Text style={styles.resultTitle}>{props.tr("scanFailed")}</Text>
+        <LightMetric label={props.tr("creditedPoints")} value="0" />
         <PrimaryButton label={props.tr("scanAnother")} onPress={props.onScanAnother} />
       </View>
     );
@@ -2019,13 +2291,16 @@ function ScanResultPanel(props: {
   const { result } = props.result;
   return (
     <View style={styles.scanResultPanel}>
-      <View style={styles.resultIconSuccess}>
-        <Text style={styles.resultIconText}>✓</Text>
+      <View style={styles.resultHeaderBlock}>
+        <StateGlyph tone="success" />
+        <View style={styles.resultHeaderCopy}>
+          <Text style={styles.resultTitle}>{props.tr("readyToAdd")}</Text>
+          <Text style={styles.resultSubtitle}>
+            {props.tr("transactionReference")}: {result.qrId}
+          </Text>
+        </View>
+        <StatusBadge label={props.tr("reservedInCart")} tone="warning" />
       </View>
-      <Text style={styles.resultTitle}>{props.tr("readyToAdd")}</Text>
-      <Text style={styles.resultSubtitle}>
-        {props.tr("transactionReference")}: {result.qrId}
-      </Text>
       <View style={styles.resultProductCard}>
         <View style={styles.productThumb}>
           <TabGlyph routeName="Scan" focused />
@@ -2037,18 +2312,12 @@ function ScanResultPanel(props: {
           <Text style={styles.mutedText}>{result.reservedAt ? new Date(result.reservedAt).toLocaleString() : ""}</Text>
         </View>
         {props.result.showPoints ? (
-          <View style={styles.pointsDeltaBox}>
-            <Text style={styles.pointsDeltaText}>+{result.qrValuePoints}</Text>
-            <Text style={styles.mutedText}>{props.tr("qrValue")}</Text>
-          </View>
+          <LightMetric label={props.tr("qrValue")} value={`+${result.qrValuePoints}`} emphasis compact />
         ) : null}
       </View>
       {props.result.showPoints ? (
         <View style={styles.balanceResultCard}>
-          <Text style={styles.overline}>{props.tr("pointsInCart")}</Text>
-          <Text style={styles.balanceResultValue}>
-            {result.cart.cartTotalPoints.toLocaleString("en-IN")} {props.tr("points")}
-          </Text>
+          <LightMetric label={props.tr("pointsInCart")} value={`${result.cart.cartTotalPoints.toLocaleString("en-IN")} ${props.tr("points")}`} emphasis />
         </View>
       ) : (
         <View style={styles.balanceResultCard}>
@@ -2074,12 +2343,11 @@ function ScanFailurePanel(props: {
 
   return (
     <View style={styles.scanResultPanel}>
-      <View style={failure.tone === "warning" ? styles.resultIconWarning : styles.resultIconDanger}>
-        <Text style={failure.tone === "warning" ? styles.resultIconWarningText : styles.resultIconDangerText}>!</Text>
-      </View>
+      <StateGlyph tone={failure.tone} />
       <Text style={styles.resultTitle}>{failure.title}</Text>
       {failure.siteLabel ? <Text style={styles.resultSubtitle}>{failure.siteLabel}</Text> : null}
       <Text style={styles.resultFailureBody}>{failure.body}</Text>
+      <LightMetric label={props.tr("creditedPoints")} value="0" />
       <PrimaryButton label={props.tr("scanAnother")} onPress={props.onScanAnother} />
     </View>
   );
@@ -2101,7 +2369,13 @@ function SitesView(props: {
     <Panel title={props.tr("yourSites")}>
       <Text style={styles.helperText}>{isTeamMember ? props.tr("teamSiteSelectHint") : props.tr("siteManageHint")}</Text>
       {!isTeamMember ? <PrimaryButton label={props.tr("addSite")} onPress={props.onAddSite} /> : null}
-      {props.sites.length === 0 ? <Text style={styles.emptyText}>{props.tr("noSites")}</Text> : null}
+      {props.sites.length === 0 ? (
+        <StateCard
+          body={isTeamMember ? props.tr("teamMemberNoSitesShort") : props.tr("siteFormHint")}
+          title={props.tr("noSites")}
+          tone="muted"
+        />
+      ) : null}
       {props.sites.map((site) => (
         <View key={site.siteId} style={[styles.siteRow, props.selectedSiteId === site.siteId ? styles.siteRowSelected : undefined]}>
           <Pressable
@@ -2111,10 +2385,13 @@ function SitesView(props: {
           >
             <View style={styles.siteRowTop}>
               <Text style={styles.cardTitle}>{siteLabel(site)}</Text>
-              {props.selectedSiteId === site.siteId ? <StatusBadge label={props.tr("selected")} tone="success" /> : null}
+              <View style={styles.siteBadgeRow}>
+                {props.selectedSiteId === site.siteId ? <StatusBadge label={props.tr("selected")} tone="success" /> : null}
+                <StatusBadge label={site.status === "ACTIVE" ? props.tr("active") : props.tr("archived")} tone={site.status === "ACTIVE" ? "success" : "muted"} />
+              </View>
             </View>
             <Text style={styles.mutedText}>
-              {site.status === "ACTIVE" ? props.tr("active") : props.tr("archived")} · {site.scanCount} {props.tr("scans")}
+              {site.scanCount} {props.tr("scans")}
             </Text>
           </Pressable>
           {site.status === "ACTIVE" ? (
@@ -2155,7 +2432,7 @@ function SiteDetailView(props: {
   if (!site) {
     return (
       <Panel title={props.tr("siteDetail")}>
-        <Text style={styles.emptyText}>{props.tr("siteNotFound")}</Text>
+        <StateCard body={props.tr("siteManageHint")} title={props.tr("siteNotFound")} tone="danger" />
       </Panel>
     );
   }
@@ -2164,14 +2441,22 @@ function SiteDetailView(props: {
 
   return (
     <Panel title={props.tr("siteDetail")}>
-      <View style={styles.siteDetailHeader}>
-        <Text style={styles.cardTitle}>{siteLabel(site)}</Text>
-        <StatusBadge label={active ? props.tr("active") : props.tr("archived")} tone={active ? "success" : "muted"} />
+      <View style={styles.siteDetailHeroCard}>
+        <View style={styles.siteDetailHeader}>
+          <View style={styles.siteDetailHeaderCopy}>
+            <Text style={styles.overline}>{active ? props.tr("siteReadyForScan") : props.tr("archived")}</Text>
+            <Text style={styles.siteDetailTitle}>{siteLabel(site)}</Text>
+          </View>
+          <StatusBadge label={active ? props.tr("active") : props.tr("archived")} tone={active ? "success" : "muted"} />
+        </View>
+        <View style={styles.lightMetricRow}>
+          <LightMetric label={props.tr("scanHistory")} value={`${site.scanCount} ${props.tr("scans")}`} />
+          <LightMetric label={props.tr("selectedSite")} value={props.selectedSiteId === site.siteId ? props.tr("selected") : props.tr("notSelected")} emphasis={props.selectedSiteId === site.siteId} />
+        </View>
+        {!active ? <Text style={styles.mutedText}>{props.tr("siteArchivedNotice")}</Text> : null}
       </View>
       <DashboardRow label={props.tr("clientName")} value={site.clientName} />
       <DashboardRow label={props.tr("address")} value={[site.flatOrApartmentNo, site.buildingName, site.area, site.city].filter(Boolean).join(", ") || "-"} />
-      <DashboardRow label={props.tr("scanHistory")} value={`${site.scanCount} ${props.tr("scans")}`} />
-      <DashboardRow label={props.tr("selectedSite")} value={props.selectedSiteId === site.siteId ? props.tr("selected") : props.tr("notSelected")} />
       {active ? <PrimaryButton label={props.tr("useSite")} onPress={() => props.setSelectedSiteId(site.siteId)} /> : null}
       {!isTeamMember && active ? (
         <View style={styles.formBlock}>
@@ -2222,7 +2507,7 @@ function SiteFormView(props: {
   if (isTeamMember) {
     return (
       <Panel title={props.tr("siteForm")}>
-        <Text style={styles.helperText}>{props.tr("permissionDenied")}</Text>
+        <StateCard body={props.tr("teamMemberSiteReadOnly")} title={props.tr("permissionDenied")} tone="warning" />
       </Panel>
     );
   }
@@ -2288,7 +2573,9 @@ function HistoryView(props: {
           </Pressable>
         ))}
       </ScrollView>
-      {visibleHistory.length === 0 ? <Text style={styles.emptyText}>{props.tr("emptyHistory")}</Text> : null}
+      {visibleHistory.length === 0 ? (
+        <StateCard body={props.tr("noResultsHint")} title={props.tr("emptyHistory")} tone="muted" />
+      ) : null}
       {visibleHistory.map((entry) => (
         <HistoryRow key={entry.scanAttemptId} entry={entry} tr={props.tr} onPress={() => props.onOpenDetail(entry.scanAttemptId)} />
       ))}
@@ -2309,7 +2596,7 @@ function RewardsView(props: {
   if (!props.catalog) {
     return (
       <Panel title={props.tr("rewards")}>
-        <Text style={styles.helperText}>{props.tr("loading")}</Text>
+        <StateCard body={props.tr("rewardsIntro")} title={props.tr("loading")} tone="muted" />
       </Panel>
     );
   }
@@ -2359,7 +2646,9 @@ function RewardsView(props: {
       </View>
 
       <Panel title={rewardPanelTitle(activeTab, props.tr)}>
-        {visibleRewards.length === 0 ? <Text style={styles.emptyText}>{rewardEmptyText(activeTab, props.tr)}</Text> : null}
+        {visibleRewards.length === 0 ? (
+          <StateCard body={props.tr("noResultsHint")} title={rewardEmptyText(activeTab, props.tr)} tone="muted" />
+        ) : null}
         {visibleRewards.map((reward) => (
           <RewardTile
             key={reward.rewardId}
@@ -2424,7 +2713,7 @@ function RewardDetailScreen(props: {
           onCancel={submitCancel}
         />
       ) : (
-        <Text style={styles.emptyText}>{props.tr("noRewards")}</Text>
+        <StateCard body={props.tr("rewardsIntro")} title={props.tr("noRewards")} tone="muted" />
       )}
     </Panel>
   );
@@ -2474,7 +2763,9 @@ function BalanceBookView(props: {
           </Pressable>
         ))}
       </ScrollView>
-      {filteredBook.length === 0 ? <Text style={styles.emptyText}>{props.tr("noLedger")}</Text> : null}
+      {filteredBook.length === 0 ? (
+        <StateCard body={props.tr("noResultsHint")} title={props.tr("noLedger")} tone="muted" />
+      ) : null}
       {filteredBook.map((entry) => (
         <BalanceBookRow key={entry.ledgerEntryId} entry={entry} tr={props.tr} onPress={() => props.onOpenEntry(entry.ledgerEntryId)} />
       ))}
@@ -2491,7 +2782,7 @@ function HistoryDetailView(props: {
   if (!props.entry) {
     return (
       <Panel title={props.tr("scanDetail")}>
-        <Text style={styles.emptyText}>{props.tr("noHistoryEntry")}</Text>
+        <StateCard body={props.tr("noResultsHint")} title={props.tr("noHistoryEntry")} tone="muted" />
       </Panel>
     );
   }
@@ -2506,16 +2797,27 @@ function HistoryDetailView(props: {
 
   return (
     <Panel title={props.tr("scanDetail")}>
-      <View style={styles.detailHeader}>
-        <Text style={styles.cardTitle}>{detailTitle}</Text>
-        <StatusBadge label={scanResultDisplayLabel(props.entry.result, props.tr)} tone={tone} />
-      </View>
-      {canShowPoints ? (
-        <View style={styles.scanCartMetricRow}>
-          <Metric label={props.tr("qrValue")} value={typeof props.entry.qrValuePoints === "number" ? String(props.entry.qrValuePoints) : "-"} emphasis />
-          <Metric label={props.tr("creditedPoints")} value={creditedPointsLabel} />
+      <View style={styles.detailHeroCard}>
+        <View style={styles.resultHeaderBlock}>
+          <StateGlyph tone={tone} />
+          <View style={styles.resultHeaderCopy}>
+            <Text numberOfLines={2} style={styles.detailHeroTitle}>{detailTitle}</Text>
+            <Text style={styles.resultSubtitle}>{formatDateTime(props.entry.createdAt)}</Text>
+          </View>
+          <StatusBadge label={scanResultDisplayLabel(props.entry.result, props.tr)} tone={tone} />
         </View>
-      ) : null}
+        {canShowPoints ? (
+          <View style={styles.lightMetricRow}>
+            <LightMetric label={props.tr("qrValue")} value={typeof props.entry.qrValuePoints === "number" ? String(props.entry.qrValuePoints) : "-"} emphasis />
+            <LightMetric label={props.tr("creditedPoints")} value={creditedPointsLabel} />
+          </View>
+        ) : (
+          <View style={styles.detailNoticeInline}>
+            <Text style={styles.overline}>{props.tr("teamMember")}</Text>
+            <Text style={styles.mutedText}>{props.tr("teamHistoryScope")}</Text>
+          </View>
+        )}
+      </View>
       <DashboardRow label={props.tr("attemptId")} value={props.entry.scanAttemptId} />
       <DashboardRow label={props.tr("scannedAt")} value={formatDateTime(props.entry.createdAt)} />
       <DashboardRow label={props.tr("actor")} value={actorLabel} />
@@ -2524,7 +2826,6 @@ function HistoryDetailView(props: {
       {props.entry.productSku ? <DashboardRow label={props.tr("product")} value={props.entry.productSku} /> : null}
       {props.entry.qrCodeId ? <DashboardRow label={props.tr("qrCode")} value={props.entry.qrCodeId} /> : null}
       {props.entry.qrUnitId ? <DashboardRow label={props.tr("qrUnit")} value={props.entry.qrUnitId} /> : null}
-      {canShowPoints ? <DashboardRow label={props.tr("creditedPoints")} value={creditedPointsLabel} /> : null}
       {props.entry.failureReason ? <DashboardRow label={props.tr("failureReason")} value={props.entry.failureReason} /> : null}
       {props.entry.result === "RESERVED" ? (
         <View style={styles.formBlock}>
@@ -2542,24 +2843,34 @@ function BalanceBookDetailView(props: {
   if (!props.entry) {
     return (
       <Panel title={props.tr("ledgerDetail")}>
-        <Text style={styles.emptyText}>{props.tr("noLedgerEntry")}</Text>
+        <StateCard body={props.tr("noResultsHint")} title={props.tr("noLedgerEntry")} tone="muted" />
       </Panel>
     );
   }
 
   const pointsValue = props.entry.pointsDelta === 0 ? "0" : `${props.entry.pointsDelta > 0 ? "+" : ""}${props.entry.pointsDelta}`;
+  const positive = props.entry.pointsDelta > 0;
+  const zero = props.entry.pointsDelta === 0;
 
   return (
     <Panel title={props.tr("ledgerDetail")}>
-      <View style={styles.detailHeader}>
-        <Text style={styles.cardTitle}>{balanceBookTitle(props.entry)}</Text>
-        {props.entry.negativeBalance ? <StatusBadge label={props.tr("negativeBalance")} tone="danger" /> : null}
+      <View style={styles.detailHeroCard}>
+        <View style={styles.resultHeaderBlock}>
+          <LedgerMarker positive={positive} zero={zero} negativeBalance={props.entry.negativeBalance} />
+          <View style={styles.resultHeaderCopy}>
+            <Text numberOfLines={2} style={styles.detailHeroTitle}>{balanceBookTitle(props.entry)}</Text>
+            <Text style={styles.resultSubtitle}>{formatDateTime(props.entry.createdAt)}</Text>
+          </View>
+          {props.entry.negativeBalance ? <StatusBadge label={props.tr("negativeBalance")} tone="danger" /> : <StatusBadge label={props.tr("success")} tone={positive ? "success" : "muted"} />}
+        </View>
+        <View style={styles.lightMetricRow}>
+          <LightMetric label={props.tr("pointsChange")} value={pointsValue} emphasis={positive} />
+          <LightMetric label={props.tr("balanceAfter")} value={String(props.entry.balanceAfter)} />
+        </View>
       </View>
       <DashboardRow label={props.tr("ledgerEntryId")} value={props.entry.ledgerEntryId} />
       <DashboardRow label={props.tr("createdAt")} value={formatDateTime(props.entry.createdAt)} />
       <DashboardRow label={props.tr("eventType")} value={props.entry.type} />
-      <DashboardRow label={props.tr("pointsChange")} value={pointsValue} />
-      <DashboardRow label={props.tr("balanceAfter")} value={String(props.entry.balanceAfter)} />
       <DashboardRow label={props.tr("sourceType")} value={props.entry.sourceType} />
       <DashboardRow label={props.tr("sourceReference")} value={props.entry.sourceId} />
       {props.entry.rewardName ? <DashboardRow label={props.tr("reward")} value={props.entry.rewardName} /> : null}
@@ -2582,8 +2893,13 @@ function RewardTile(props: {
   const tone = rewardTone(props.reward);
   return (
     <Pressable
+      accessibilityLabel={`${props.reward.name}, ${rewardStatusLabel(props.reward, props.tr)}`}
       accessibilityRole="button"
-      style={[props.compact ? styles.rewardTileCompact : styles.rewardTile, props.selected ? styles.rewardTileSelected : undefined]}
+      style={({ pressed }) => [
+        props.compact ? styles.rewardTileCompact : styles.rewardTile,
+        props.selected ? styles.rewardTileSelected : undefined,
+        pressed ? styles.pressed : undefined,
+      ]}
       onPress={props.onPress}
     >
       <RewardImage reward={props.reward} variant={props.compact ? "compactTile" : "tile"} />
@@ -2623,39 +2939,57 @@ function RewardDetail(props: {
 }) {
   const redeemDisabled = props.reward.status !== "ELIGIBLE";
   const balanceAfterClaim = props.availablePoints - props.reward.pointsRequired;
+  const progress = Math.max(0.04, Math.min(1, (props.reward.pointsRequired - props.reward.pointsGap) / Math.max(1, props.reward.pointsRequired)));
+  const tone = rewardTone(props.reward);
   return (
     <View style={styles.rewardDetail}>
       <RewardImage reward={props.reward} variant="detail" />
       {props.notice ? <Text style={styles.successNotice}>{props.notice}</Text> : null}
-      <View style={styles.rewardDetailTop}>
-        <View style={styles.rewardDetailCopy}>
-          <Text style={styles.cardTitle}>{props.reward.name}</Text>
-          <Text style={styles.mutedText}>{props.reward.description ?? props.reward.displayValue}</Text>
-          <Text style={styles.rewardMetaLine}>
-            {props.reward.displayValue} · {props.reward.pointsRequired.toLocaleString("en-IN")} {props.tr("points")}
-          </Text>
-          {props.reward.claimId ? (
-            <Text style={styles.claimText}>
-              {props.tr("claimId")}: {props.reward.claimId}
-            </Text>
-          ) : null}
+      <View style={styles.rewardDetailSummaryCard}>
+        <View style={styles.rewardDetailTop}>
+          <View style={styles.rewardDetailCopy}>
+            <Text style={styles.overline}>{props.tr("rewardStatus")}</Text>
+            <Text numberOfLines={3} style={styles.rewardDetailTitle}>{props.reward.name}</Text>
+            <Text style={styles.mutedText}>{props.reward.description ?? props.reward.displayValue}</Text>
+          </View>
+          <StatusBadge label={rewardStatusLabel(props.reward, props.tr)} tone={tone} />
         </View>
+        <View style={styles.rewardDetailProgressBlock}>
+          <View style={styles.rewardDetailProgressHeader}>
+            <Text style={styles.overline}>{props.tr("unlockProgress")}</Text>
+            <Text style={styles.rewardMetaLine}>{rewardGapLabel(props.reward, props.tr)}</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          </View>
+        </View>
+        {props.reward.claimId ? (
+          <Text style={styles.claimText}>
+            {props.tr("claimId")}: {props.reward.claimId}
+          </Text>
+        ) : null}
       </View>
-      <View style={styles.rewardMetaRow}>
-        <Metric label={props.tr("requiredPoints")} value={String(props.reward.pointsRequired)} emphasis />
-        <Metric label={props.tr("tier")} value={props.reward.tierRequired ?? "Silver"} emphasis />
+      <View style={styles.lightMetricRow}>
+        <LightMetric label={props.tr("requiredPoints")} value={props.reward.pointsRequired.toLocaleString("en-IN")} emphasis />
+        <LightMetric label={props.tr("tier")} value={props.reward.tierRequired ?? "Silver"} />
       </View>
       {props.reward.status === "ELIGIBLE" ? (
-        <DashboardRow label={props.tr("balanceAfterClaim")} value={String(balanceAfterClaim)} />
+        <LightMetric label={props.tr("balanceAfterClaim")} value={balanceAfterClaim.toLocaleString("en-IN")} emphasis />
       ) : null}
       {props.reward.status === "LOCKED" ? (
-        <DashboardRow label={props.tr("pointsNeeded")} value={String(props.reward.pointsGap)} />
+        <StateCard body={rewardGapLabel(props.reward, props.tr)} title={props.tr("lockedRewardNotice")} tone="warning" compact />
       ) : null}
       {props.reward.status === "CHOSEN" ? (
-        <>
-          <DashboardRow label={props.tr("pointsSpent")} value={String(props.reward.pointsRequired)} />
+        <View style={styles.rewardClaimCard}>
+          <View style={styles.lightMetricRow}>
+            <LightMetric label={props.tr("pointsSpent")} value={props.reward.pointsRequired.toLocaleString("en-IN")} />
+            <LightMetric label={props.tr("status")} value={props.tr("chosen")} emphasis />
+          </View>
           <Text style={styles.helperText}>{props.tr("cancelCutoff")}</Text>
-        </>
+        </View>
+      ) : null}
+      {props.reward.status === "FULFILLED" ? (
+        <StateCard body={props.tr("deliveredRewardNotice")} title={props.tr("fulfilled")} tone="success" compact />
       ) : null}
       {props.reward.status === "CHOSEN" ? (
         <PrimaryButton label={props.tr("cancelReward")} onPress={() => void props.onCancel(props.reward)} />
@@ -2675,14 +3009,12 @@ function RewardDetail(props: {
           </Text>
         </Pressable>
       )}
-      {redeemDisabled && props.reward.status === "LOCKED" ? (
-        <Text style={styles.helperText}>{rewardGapLabel(props.reward, props.tr)}</Text>
-      ) : null}
     </View>
   );
 }
 
 function RewardImage(props: { readonly reward: RewardCatalogTile; readonly variant: "compactTile" | "tile" | "detail" }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const frameStyle =
     props.variant === "detail"
       ? styles.rewardImageDetailFrame
@@ -2692,10 +3024,15 @@ function RewardImage(props: { readonly reward: RewardCatalogTile; readonly varia
   const imageStyle = props.variant === "detail" ? styles.rewardImageDetail : styles.rewardImageTile;
   const imageUrl = props.reward.imageUrl;
 
-  if (imageUrl && !imageUrl.startsWith("data:image/svg+xml")) {
+  if (imageUrl && !imageFailed && !imageUrl.startsWith("data:image/svg+xml")) {
     return (
       <View style={frameStyle}>
-        <Image source={{ uri: imageUrl }} style={imageStyle} resizeMode="cover" />
+        <Image
+          source={{ uri: imageUrl }}
+          style={imageStyle}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
       </View>
     );
   }
@@ -2717,6 +3054,7 @@ function BalanceBookRow(props: { readonly entry: BalanceBookEntry; readonly tr: 
   const zero = props.entry.pointsDelta === 0;
   return (
     <Pressable accessibilityRole="button" style={({ pressed }) => [styles.balanceBookRow, pressed ? styles.pressed : undefined]} onPress={props.onPress}>
+      <LedgerMarker positive={positive} zero={zero} negativeBalance={props.entry.negativeBalance} />
       <View style={styles.historyMain}>
         <Text numberOfLines={2} style={styles.cardTitle}>{balanceBookTitle(props.entry)}</Text>
         <Text numberOfLines={1} style={styles.mutedText}>{new Date(props.entry.createdAt).toLocaleString()}</Text>
@@ -2737,6 +3075,27 @@ function BalanceBookRow(props: { readonly entry: BalanceBookEntry; readonly tr: 
   );
 }
 
+function LedgerMarker(props: { readonly negativeBalance: boolean; readonly positive: boolean; readonly zero: boolean }) {
+  const markerStyle = props.negativeBalance
+    ? styles.ledgerMarkerDanger
+    : props.zero
+      ? styles.ledgerMarkerNeutral
+      : props.positive
+        ? styles.ledgerMarkerPositive
+        : styles.ledgerMarkerWarning;
+  const markerText = props.zero ? "0" : props.positive ? "+" : "-";
+  const markerTextStyle = props.negativeBalance || (!props.zero && !props.positive)
+    ? styles.ledgerMarkerTextWarning
+    : props.zero
+      ? styles.ledgerMarkerTextNeutral
+      : undefined;
+  return (
+    <View style={[styles.ledgerMarker, markerStyle]}>
+      <Text style={[styles.ledgerMarkerText, markerTextStyle]}>{markerText}</Text>
+    </View>
+  );
+}
+
 function SiteChooser(props: {
   readonly sites: readonly SiteSummary[];
   readonly selectedSiteId: string;
@@ -2747,7 +3106,9 @@ function SiteChooser(props: {
   return (
     <View style={styles.siteChooser}>
       <Text style={styles.sectionTitle}>{props.tr("selectOrChangeSite")}</Text>
-      {activeSites.length === 0 ? <Text style={styles.emptyText}>{props.tr("noSites")}</Text> : null}
+      {activeSites.length === 0 ? (
+        <StateCard body={props.tr("selectSiteBeforeScan")} title={props.tr("noSites")} tone="warning" />
+      ) : null}
       <View style={styles.siteChoiceList}>
         {activeSites.map((site) => (
           <Pressable
@@ -2758,7 +3119,10 @@ function SiteChooser(props: {
           >
             <View style={styles.siteRowTop}>
               <Text numberOfLines={1} style={styles.cardTitle}>{site.clientName}</Text>
-              {props.selectedSiteId === site.siteId ? <StatusBadge label={props.tr("selected")} tone="success" /> : null}
+              <View style={styles.siteBadgeRow}>
+                {props.selectedSiteId === site.siteId ? <StatusBadge label={props.tr("selected")} tone="success" /> : null}
+                <StatusBadge label={props.tr("active")} tone="success" />
+              </View>
             </View>
             <Text numberOfLines={1} style={styles.mutedText}>{siteLabel(site)}</Text>
           </Pressable>
@@ -2796,22 +3160,13 @@ function HistoryRow(props: { readonly entry: ScanHistoryEntry; readonly onPress:
 
 function HistoryMarker(props: { readonly teamMember: boolean; readonly tone: StatusTone }) {
   const active = props.tone === "success";
-  if (props.teamMember) {
-    return (
-      <View style={[styles.historyMarker, active ? styles.historyMarkerSuccess : undefined]}>
-        <View style={styles.historyMarkerQrGrid}>
-          {[0, 1, 2, 3].map((cell) => (
-            <View key={cell} style={[styles.historyMarkerQrCell, active ? styles.historyMarkerGlyphActive : undefined]} />
-          ))}
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.historyMarker, active ? styles.historyMarkerSuccess : undefined]}>
-      <View style={[styles.historyMarkerPersonHead, active ? styles.historyMarkerGlyphActive : undefined]} />
-      <View style={[styles.historyMarkerPersonBody, active ? styles.historyMarkerGlyphActive : undefined]} />
+      <Feather
+        name={props.teamMember ? "users" : "user-check"}
+        color={active ? theme.colors.success : theme.colors.muted}
+        size={18}
+      />
     </View>
   );
 }
@@ -2828,13 +3183,6 @@ function BottomTabs(props: {
     sites: "sites",
     history: "history",
     rewards: "rewards",
-  };
-  const symbols: Record<ViewKey, string> = {
-    home: "HM",
-    scan: "QR",
-    sites: "ST",
-    history: "HI",
-    rewards: "RW",
   };
   return (
     <View style={styles.bottomTabs}>
@@ -2858,15 +3206,11 @@ function BottomTabs(props: {
               props.activeView === tab ? styles.tabSymbolActive : undefined,
             ]}
           >
-            <Text
-              style={[
-                styles.tabSymbolText,
-                tab === "scan" ? styles.tabSymbolTextScan : undefined,
-                props.activeView === tab ? styles.tabSymbolTextActive : undefined,
-              ]}
-            >
-              {symbols[tab]}
-            </Text>
+            <Feather
+              name={tabIconName(tab)}
+              color={props.activeView === tab ? theme.colors.primary : tab === "scan" ? "#FFFFFF" : theme.colors.muted}
+              size={tab === "scan" ? 22 : 20}
+            />
           </View>
           <Text style={[styles.tabText, props.activeView === tab ? styles.tabTextActive : undefined]}>{props.tr(labels[tab])}</Text>
         </Pressable>
@@ -2922,14 +3266,14 @@ function Field(props: {
       {secure ? (
         <View style={styles.secureInputWrap}>
           {input}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={showSecureText ? props.hideLabel ?? "Hide" : props.revealLabel ?? "Show"}
+          <SecretVisibilityButton
+            fieldLabel={props.label}
+            hideLabel={props.hideLabel ?? "Hide"}
             onPress={() => setShowSecureText((current) => !current)}
-            style={styles.secureRevealButton}
-          >
-            <Text style={styles.secureRevealText}>{showSecureText ? props.hideLabel ?? "Hide" : props.revealLabel ?? "Show"}</Text>
-          </Pressable>
+            revealLabel={props.revealLabel ?? "Show"}
+            variant="inside"
+            visible={showSecureText}
+          />
         </View>
       ) : (
         input
@@ -2954,7 +3298,16 @@ function PinField(props: {
   const digits = props.value.slice(0, 4).split("");
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{props.label}</Text>
+      <View style={styles.fieldLabelRow}>
+        <Text style={[styles.fieldLabel, styles.fieldLabelInline]}>{props.label}</Text>
+        <SecretVisibilityButton
+          fieldLabel={props.label}
+          hideLabel={props.hideLabel}
+          onPress={() => setShowPin((current) => !current)}
+          revealLabel={props.revealLabel}
+          visible={showPin}
+        />
+      </View>
       <View style={styles.pinWrap}>
         <TextInput
           accessibilityLabel={props.label}
@@ -2968,16 +3321,45 @@ function PinField(props: {
         />
         <View style={[styles.pinBoxes, styles.noPointerEvents]}>
           {[0, 1, 2, 3].map((index) => (
-            <View key={index} style={[styles.pinBox, props.value.length === index ? styles.pinBoxActive : undefined]}>
+            <View
+              key={index}
+              style={[
+                styles.pinBox,
+                index < 3 ? styles.pinBoxGap : undefined,
+                props.value.length === index ? styles.pinBoxActive : undefined,
+              ]}
+            >
               <Text style={styles.pinBoxText}>{digits[index] ? (showPin ? digits[index] : "•") : ""}</Text>
             </View>
           ))}
         </View>
       </View>
-      <Pressable accessibilityRole="button" onPress={() => setShowPin((current) => !current)} style={styles.pinRevealButton}>
-        <Text style={styles.pinRevealText}>{showPin ? props.hideLabel : props.revealLabel}</Text>
-      </Pressable>
     </View>
+  );
+}
+
+function SecretVisibilityButton(props: {
+  readonly fieldLabel: string;
+  readonly hideLabel: string;
+  readonly onPress: () => void;
+  readonly revealLabel: string;
+  readonly variant?: "inline" | "inside";
+  readonly visible: boolean;
+}) {
+  const visibilityLabel = `${props.visible ? props.hideLabel : props.revealLabel} ${props.fieldLabel}`;
+  return (
+    <Pressable
+      accessibilityLabel={visibilityLabel}
+      accessibilityRole="button"
+      accessibilityState={{ selected: props.visible }}
+      onPress={props.onPress}
+      style={[
+        styles.secretVisibilityButton,
+        props.variant === "inside" ? styles.secretVisibilityButtonInside : undefined,
+      ]}
+    >
+      <Feather name={props.visible ? "eye-off" : "eye"} color={theme.colors.primary} size={20} />
+    </Pressable>
   );
 }
 
@@ -3043,6 +3425,73 @@ function Metric(props: { readonly label: string; readonly value: string; readonl
   );
 }
 
+function LightMetric(props: { readonly label: string; readonly value: string; readonly emphasis?: boolean; readonly compact?: boolean }) {
+  const wrapsTextValue = /[A-Za-z]/.test(props.value) && props.value.length > 7;
+
+  return (
+    <View style={[styles.lightMetric, props.emphasis ? styles.lightMetricEmphasis : undefined, props.compact ? styles.lightMetricCompact : undefined]}>
+      <Text
+        numberOfLines={wrapsTextValue ? 2 : 1}
+        adjustsFontSizeToFit={!wrapsTextValue}
+        minimumFontScale={0.76}
+        style={[
+          styles.lightMetricValue,
+          wrapsTextValue ? styles.lightMetricValueWrap : undefined,
+          props.emphasis ? styles.lightMetricValueEmphasis : undefined,
+        ]}
+      >
+        {props.value}
+      </Text>
+      <Text numberOfLines={2} style={styles.lightMetricLabel}>{props.label}</Text>
+    </View>
+  );
+}
+
+function StateCard(props: {
+  readonly body?: string;
+  readonly compact?: boolean;
+  readonly title: string;
+  readonly tone: StatusTone;
+}) {
+  return (
+    <View style={[styles.stateCard, props.compact ? styles.stateCardCompact : undefined]}>
+      <StateGlyph compact={Boolean(props.compact)} tone={props.tone} />
+      <View style={styles.stateCardCopy}>
+        <Text style={styles.stateCardTitle}>{props.title}</Text>
+        {props.body ? <Text style={styles.stateCardBody}>{props.body}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function StateGlyph(props: { readonly compact?: boolean; readonly tone: StatusTone }) {
+  const symbol = props.tone === "success" ? "✓" : props.tone === "danger" ? "!" : props.tone === "warning" ? "!" : "i";
+  return (
+    <View
+      style={[
+        styles.stateGlyph,
+        props.compact ? styles.stateGlyphCompact : undefined,
+        props.tone === "success" ? styles.stateGlyphSuccess : undefined,
+        props.tone === "warning" ? styles.stateGlyphWarning : undefined,
+        props.tone === "danger" ? styles.stateGlyphDanger : undefined,
+        props.tone === "muted" ? styles.stateGlyphMuted : undefined,
+      ]}
+    >
+      <Text
+        style={[
+          styles.stateGlyphText,
+          props.tone === "success" ? styles.stateGlyphTextSuccess : undefined,
+          props.tone === "warning" ? styles.stateGlyphTextWarning : undefined,
+          props.tone === "danger" ? styles.stateGlyphTextDanger : undefined,
+          props.tone === "muted" ? styles.stateGlyphTextMuted : undefined,
+        ]}
+      >
+        {symbol}
+      </Text>
+    </View>
+  );
+}
+
 function QuickAction(props: {
   readonly icon: "history" | "ledger";
   readonly title: string;
@@ -3065,25 +3514,36 @@ function QuickAction(props: {
 }
 
 function QuickActionIcon(props: { readonly icon: "history" | "ledger"; readonly primary?: boolean }) {
-  const lineStyle = props.primary ? styles.quickIconLinePrimary : styles.quickIconLine;
-  if (props.icon === "history") {
-    return (
-      <View style={[styles.quickIcon, props.primary ? styles.quickIconPrimary : undefined]}>
-        <View style={styles.quickClockFace}>
-          <View style={lineStyle} />
-          <View style={[lineStyle, styles.quickClockHand]} />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.quickIcon, props.primary ? styles.quickIconPrimary : undefined]}>
-      <View style={[lineStyle, styles.quickLedgerLineWide]} />
-      <View style={[lineStyle, styles.quickLedgerLine]} />
-      <View style={[lineStyle, styles.quickLedgerLineWide]} />
+      <Feather
+        name={props.icon === "history" ? "clock" : "book-open"}
+        color={props.primary ? "#FFFFFF" : theme.colors.primary}
+        size={22}
+      />
     </View>
   );
+}
+
+function tabIconName(routeName: string): FeatherIconName {
+  switch (routeName) {
+    case "Dashboard":
+    case "home":
+      return "home";
+    case "Scan":
+    case "scan":
+      return "maximize";
+    case "History":
+    case "history":
+      return "clock";
+    case "Rewards":
+    case "rewards":
+      return "gift";
+    case "sites":
+      return "map-pin";
+    default:
+      return "circle";
+  }
 }
 
 function StatusBadge(props: { readonly label: string; readonly tone: StatusTone }) {
@@ -3093,8 +3553,14 @@ function StatusBadge(props: { readonly label: string; readonly tone: StatusTone 
     warning: theme.colors.warning,
     muted: theme.colors.muted,
   }[props.tone];
+  const backgroundColor = {
+    success: theme.colors.successSoft,
+    danger: theme.colors.dangerSoft,
+    warning: theme.colors.warningSoft,
+    muted: theme.colors.surfaceMuted,
+  }[props.tone];
   return (
-    <View style={[styles.statusBadge, { borderColor: color }]}>
+    <View style={[styles.statusBadge, { backgroundColor, borderColor: color }]}>
       <Text style={[styles.statusText, { color }]}>{props.label}</Text>
     </View>
   );
@@ -3183,6 +3649,19 @@ function readFileAsDataUrl(file: unknown): Promise<string> {
   });
 }
 
+function inferProfilePhotoContentType(pathOrName: string | undefined): string {
+  const normalized = pathOrName?.toLowerCase() ?? "";
+  if (normalized.endsWith(".png")) {
+    return "image/png";
+  }
+  return "image/jpeg";
+}
+
+function base64ByteLength(base64: string): number {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+}
+
 function cleanSiteInput(input: SiteInput): SiteInput {
   return {
     clientName: input.clientName.trim(),
@@ -3244,9 +3723,9 @@ function rewardTabOptions(
   sections: RewardCatalogSections,
 ): readonly { readonly label: string; readonly value: RewardsTab }[] {
   return [
-    { label: `${tr("availableRewards")} (${sections.available.length})`, value: "AVAILABLE" },
+    { label: `${tr("available")} (${sections.available.length})`, value: "AVAILABLE" },
     { label: `${tr("chosen")} (${sections.claims.length})`, value: "CLAIMS" },
-    { label: `${tr("deliveredRewards")} (${sections.delivered.length})`, value: "DELIVERED" },
+    { label: `${tr("fulfilled")} (${sections.delivered.length})`, value: "DELIVERED" },
   ];
 }
 
@@ -3516,6 +3995,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
     width: "100%",
   },
+  offlineBanner: {
+    backgroundColor: theme.colors.danger,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  offlineBannerText: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    lineHeight: 16,
+    textAlign: "center",
+  },
   noPointerEvents: {
     pointerEvents: "none",
   },
@@ -3575,7 +4066,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     flexDirection: "row",
-    minHeight: 32,
+    minHeight: theme.touch.compact,
     paddingHorizontal: theme.spacing.sm,
   },
   languageText: {
@@ -3591,6 +4082,7 @@ const styles = StyleSheet.create({
     marginHorizontal: theme.spacing.xs,
   },
   scrollContent: {
+    minWidth: 0,
     paddingBottom: 118,
     paddingTop: theme.spacing.md,
   },
@@ -3599,13 +4091,16 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xxl,
   },
   screenContentInset: {
+    alignSelf: "center",
     gap: 10,
-    marginHorizontal: theme.spacing.md,
+    minWidth: 0,
+    paddingHorizontal: theme.layout.screenGutter,
+    width: "auto",
   },
   navTabBar: {
     backgroundColor: theme.colors.surface,
     borderTopColor: theme.colors.line,
-    minHeight: 74,
+    minHeight: theme.touch.bottomTab,
     paddingBottom: theme.spacing.sm,
     paddingTop: theme.spacing.sm,
   },
@@ -3617,9 +4112,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "transparent",
     borderRadius: theme.radius.pill,
-    height: 32,
+    height: theme.touch.compact,
     justifyContent: "center",
-    width: 48,
+    width: 54,
   },
   navTabIconActive: {
     backgroundColor: theme.colors.primarySoft,
@@ -3788,17 +4283,154 @@ const styles = StyleSheet.create({
   promoCopyBlock: {
     gap: theme.spacing.xs,
   },
+  promoTitleRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  promoAccentBar: {
+    borderRadius: theme.radius.pill,
+    minHeight: 34,
+    width: 5,
+  },
   promoTitle: {
     color: theme.colors.ink,
+    flex: 1,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 24,
+  },
+  promoMarqueeViewport: {
+    flex: 1,
+    height: 28,
+    justifyContent: "center",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  promoMarqueeTrack: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.xl,
+    minWidth: "190%",
+  },
+  promoMarqueeText: {
+    flex: 0,
+    minWidth: 220,
   },
   promoBody: {
     color: theme.colors.muted,
     fontSize: theme.typography.small,
     fontWeight: "800",
     lineHeight: 20,
+  },
+  promoMediaFallback: {
+    alignItems: "center",
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    height: 118,
+    justifyContent: "center",
+    width: "100%",
+  },
+  promoMediaFallbackCompact: {
+    height: 84,
+  },
+  promoMediaFallbackText: {
+    color: theme.colors.primaryDark,
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  walletCard: {
+    backgroundColor: theme.colors.primaryDark,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+    ...theme.shadow,
+  },
+  walletPrimaryRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    justifyContent: "space-between",
+    minHeight: 112,
+  },
+  walletPrimaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  walletOverline: {
+    color: "#BFE7EA",
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  walletValue: {
+    color: theme.colors.surface,
+    fontSize: 38,
+    fontWeight: "900",
+    lineHeight: 46,
+    marginTop: theme.spacing.xs,
+  },
+  walletSubtext: {
+    color: "#C7EEF1",
+    flexShrink: 1,
+    fontSize: theme.typography.caption,
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+  walletTierBadge: {
+    backgroundColor: theme.colors.warningSoft,
+    borderRadius: theme.radius.pill,
+    maxWidth: 116,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  walletTierText: {
+    color: theme.colors.secondaryDark,
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+  },
+  walletProgressPanel: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.16)",
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+  },
+  walletProgressHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    justifyContent: "space-between",
+  },
+  walletProgressLabel: {
+    color: "#BFE7EA",
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  walletProgressValue: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.cardTitle,
+    fontWeight: "900",
+  },
+  walletProgressTrack: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: theme.radius.pill,
+    height: 8,
+    overflow: "hidden",
+  },
+  walletProgressFill: {
+    backgroundColor: theme.colors.secondary,
+    borderRadius: theme.radius.pill,
+    height: "100%",
   },
   dashboardMetricGrid: {
     flexDirection: "row",
@@ -3881,6 +4513,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
   },
+  selectedSiteHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    justifyContent: "space-between",
+  },
   selectedSiteTitle: {
     color: theme.colors.ink,
     fontSize: theme.typography.body,
@@ -3933,6 +4571,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: theme.spacing.md,
   },
+  profileHeroCard: {
+    backgroundColor: theme.colors.primaryDark,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+    ...theme.shadow,
+  },
+  profileHeroTop: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+  },
+  profileHeroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileHeroOverline: {
+    color: "#BFE7EA",
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    marginBottom: theme.spacing.xs,
+    textTransform: "uppercase",
+  },
+  profileHeroName: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.heading,
+    fontWeight: "900",
+    lineHeight: 24,
+  },
+  profileHeroMobile: {
+    color: "#C7EEF1",
+    fontSize: theme.typography.caption,
+    fontWeight: "800",
+    marginTop: theme.spacing.xs,
+  },
   profileHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -3954,6 +4630,26 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     justifyContent: "space-between",
   },
+  profilePhotoPreviewRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  profilePhotoPreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  profileActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
   avatarLarge: {
     alignItems: "center",
     backgroundColor: theme.colors.primary,
@@ -3973,20 +4669,68 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   teamLanding: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.line,
-    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primaryDark,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     gap: theme.spacing.md,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.lg,
+    ...theme.shadow,
+  },
+  teamLandingTop: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    justifyContent: "space-between",
+  },
+  teamLandingOverline: {
+    color: "#BFE7EA",
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    marginBottom: theme.spacing.xs,
+    textTransform: "uppercase",
+  },
+  teamLandingName: {
+    color: theme.colors.surface,
+    flexShrink: 1,
+    fontSize: theme.typography.heading,
+    fontWeight: "900",
+    lineHeight: 23,
+  },
+  teamLandingMobile: {
+    color: "#C7EEF1",
+    fontSize: theme.typography.caption,
+    fontWeight: "800",
+    marginTop: theme.spacing.xs,
+  },
+  teamLandingNote: {
+    color: "#DDF6F8",
+    fontSize: theme.typography.small,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   teamSiteBox: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: theme.colors.surface,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     padding: theme.spacing.md,
+  },
+  teamLogoutButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: theme.touch.control,
+    paddingHorizontal: theme.spacing.md,
+  },
+  teamLogoutText: {
+    color: theme.colors.surface,
+    fontWeight: "900",
   },
   authIntro: {
     alignItems: "center",
@@ -4017,21 +4761,26 @@ const styles = StyleSheet.create({
   },
   authIntroSubtitle: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: theme.typography.small,
     lineHeight: 19,
     textAlign: "center",
   },
   roleCards: {
     gap: 10,
+    minWidth: 0,
+    width: "100%",
   },
   roleCard: {
     alignItems: "center",
+    alignSelf: "stretch",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
+    minWidth: 0,
     padding: 12,
     ...theme.shadow,
   },
@@ -4115,6 +4864,7 @@ const styles = StyleSheet.create({
   roleCopy: {
     flex: 1,
     minWidth: 0,
+    maxWidth: "100%",
   },
   roleTitle: {
     color: theme.colors.ink,
@@ -4123,9 +4873,12 @@ const styles = StyleSheet.create({
   },
   roleBody: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: 12,
     lineHeight: 18,
     marginTop: theme.spacing.xs,
+    maxWidth: "100%",
+    width: "100%",
   },
   roleBadge: {
     alignSelf: "flex-start",
@@ -4142,11 +4895,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   panel: {
+    alignSelf: "stretch",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     marginBottom: 10,
+    minWidth: 0,
     padding: 14,
     ...theme.shadow,
   },
@@ -4159,10 +4914,13 @@ const styles = StyleSheet.create({
   },
   panelLead: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: theme.typography.body,
     lineHeight: 22,
     marginBottom: theme.spacing.lg,
+    maxWidth: "100%",
     textAlign: "center",
+    width: "100%",
   },
   field: {
     marginBottom: theme.spacing.md,
@@ -4174,6 +4932,16 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: theme.spacing.sm,
   },
+  fieldLabelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.sm,
+  },
+  fieldLabelInline: {
+    flex: 1,
+    marginBottom: 0,
+  },
   input: {
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.lineStrong,
@@ -4181,30 +4949,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: theme.colors.ink,
     fontSize: 16,
-    minHeight: 50,
+    minHeight: theme.touch.primary,
     paddingHorizontal: 14,
   },
   secureInputWrap: {
     position: "relative",
   },
   secureInput: {
-    paddingRight: 76,
+    paddingRight: 62,
   },
-  secureRevealButton: {
+  secretVisibilityButton: {
     alignItems: "center",
-    bottom: 8,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.lineStrong,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    height: theme.touch.compact,
     justifyContent: "center",
-    minHeight: 38,
-    minWidth: 64,
-    paddingHorizontal: 8,
+    width: 48,
+  },
+  secretVisibilityButtonInside: {
     position: "absolute",
     right: 8,
-    top: 8,
-  },
-  secureRevealText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.caption,
-    fontWeight: "900",
+    top: 4,
   },
   phoneInput: {
     paddingLeft: 58,
@@ -4229,7 +4996,8 @@ const styles = StyleSheet.create({
   },
   pinBoxes: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    width: "100%",
   },
   pinBox: {
     alignItems: "center",
@@ -4237,12 +5005,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.lineStrong,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    flexGrow: 0,
-    flexShrink: 0,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
     height: 58,
     justifyContent: "center",
     minWidth: 0,
-    width: "23%",
+  },
+  pinBoxGap: {
+    marginRight: 10,
   },
   pinBoxActive: {
     borderColor: theme.colors.primary,
@@ -4250,18 +5021,6 @@ const styles = StyleSheet.create({
   pinBoxText: {
     color: theme.colors.ink,
     fontSize: 26,
-    fontWeight: "900",
-  },
-  pinRevealButton: {
-    alignItems: "center",
-    alignSelf: "flex-end",
-    minHeight: 36,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  pinRevealText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.caption,
     fontWeight: "900",
   },
   phonePrefix: {
@@ -4287,7 +5046,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     justifyContent: "center",
     marginTop: theme.spacing.sm,
-    minHeight: 54,
+    minHeight: theme.touch.primary,
     paddingHorizontal: theme.spacing.lg,
     ...theme.shadow,
   },
@@ -4310,7 +5069,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: theme.touch.control,
     paddingHorizontal: theme.spacing.md,
   },
   secondaryButtonText: {
@@ -4319,6 +5078,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.76,
+    transform: [{ scale: 0.99 }],
   },
   linkButton: {
     paddingVertical: theme.spacing.md,
@@ -4330,12 +5090,14 @@ const styles = StyleSheet.create({
   },
   helperText: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: theme.typography.body,
     lineHeight: 22,
     marginBottom: theme.spacing.md,
   },
   mutedText: {
     color: theme.colors.muted,
+    flexShrink: 1,
     fontSize: theme.typography.caption,
     lineHeight: 18,
   },
@@ -4380,7 +5142,7 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     color: theme.colors.ink,
-    fontSize: 24,
+    fontSize: theme.typography.screenTitle,
     fontWeight: "900",
     marginBottom: theme.spacing.sm,
   },
@@ -4393,32 +5155,32 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 4,
-    padding: 4,
+    gap: 2,
+    padding: 3,
   },
   rewardTab: {
     alignItems: "center",
     borderRadius: theme.radius.pill,
     justifyContent: "center",
-    minHeight: 34,
-    paddingHorizontal: 12,
+    minHeight: theme.touch.compact,
+    paddingHorizontal: 9,
   },
   rewardTabActive: {
     alignItems: "center",
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.pill,
     justifyContent: "center",
-    minHeight: 34,
-    paddingHorizontal: 12,
+    minHeight: theme.touch.compact,
+    paddingHorizontal: 9,
   },
   rewardTabText: {
     color: theme.colors.ink,
-    fontSize: theme.typography.caption,
+    fontSize: 11,
     fontWeight: "900",
   },
   rewardTabTextActive: {
     color: theme.colors.surface,
-    fontSize: theme.typography.caption,
+    fontSize: 11,
     fontWeight: "900",
   },
   bigBalanceCard: {
@@ -4482,6 +5244,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: theme.spacing.md,
     marginBottom: 10,
+    minHeight: 172,
     padding: 12,
     ...theme.shadow,
   },
@@ -4493,7 +5256,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     minHeight: 286,
     padding: theme.spacing.md,
-    width: 206,
+    width: theme.layout.rewardRailTileWidth,
     ...theme.shadow,
   },
   rewardTileSelected: {
@@ -4594,6 +5357,7 @@ const styles = StyleSheet.create({
   },
   rewardTileTitle: {
     color: theme.colors.ink,
+    flexShrink: 1,
     fontSize: theme.typography.body,
     fontWeight: "900",
     lineHeight: 20,
@@ -4615,6 +5379,7 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     fontSize: theme.typography.caption,
     fontWeight: "900",
+    lineHeight: 16,
   },
   progressTrack: {
     backgroundColor: theme.colors.line,
@@ -4641,6 +5406,38 @@ const styles = StyleSheet.create({
   },
   rewardDetail: {
     gap: theme.spacing.md,
+  },
+  rewardDetailSummaryCard: {
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  rewardDetailTitle: {
+    color: theme.colors.ink,
+    flexShrink: 1,
+    fontSize: theme.typography.heading,
+    fontWeight: "900",
+    lineHeight: 24,
+  },
+  rewardDetailProgressBlock: {
+    gap: theme.spacing.xs,
+  },
+  rewardDetailProgressHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    justifyContent: "space-between",
+  },
+  rewardClaimCard: {
+    backgroundColor: theme.colors.warningSoft,
+    borderColor: theme.colors.warning,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
   },
   successNotice: {
     backgroundColor: "#E7F7EF",
@@ -4691,7 +5488,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: theme.touch.compact,
     paddingHorizontal: theme.spacing.md,
   },
   filterChipActive: {
@@ -4734,7 +5531,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: theme.touch.control,
     paddingHorizontal: theme.spacing.md,
   },
   clearButtonText: {
@@ -4767,6 +5564,81 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 19,
     textAlign: "center",
+  },
+  cameraPermissionCard: {
+    backgroundColor: "#F4F9FF",
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  cameraScannerCard: {
+    backgroundColor: theme.colors.ink,
+    borderRadius: theme.radius.md,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    overflow: "hidden",
+    padding: theme.spacing.sm,
+  },
+  cameraPreviewShell: {
+    aspectRatio: 1,
+    backgroundColor: "#081214",
+    borderRadius: theme.radius.md,
+    overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  cameraPreview: {
+    height: "100%",
+    width: "100%",
+  },
+  cameraOverlay: {
+    alignItems: "center",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  cameraFrame: {
+    borderColor: "#FFFFFF",
+    borderRadius: theme.radius.md,
+    borderWidth: 3,
+    height: "62%",
+    opacity: 0.92,
+    width: "62%",
+  },
+  cameraScannerTitle: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.body,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  cameraScannerHint: {
+    color: "#D6E2E3",
+    fontSize: theme.typography.small,
+    fontWeight: "700",
+    lineHeight: 19,
+    paddingBottom: theme.spacing.xs,
+    textAlign: "center",
+  },
+  manualScanFallback: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  manualScanTitle: {
+    color: theme.colors.muted,
+    fontSize: theme.typography.caption,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   summary: {
     backgroundColor: theme.colors.primaryDark,
@@ -4820,8 +5692,9 @@ const styles = StyleSheet.create({
     borderColor: "#F3BBBB",
     borderRadius: theme.radius.xs,
     borderWidth: 1,
+    justifyContent: "center",
+    minHeight: theme.touch.compact,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
   },
   logoutText: {
     color: theme.colors.danger,
@@ -4858,6 +5731,49 @@ const styles = StyleSheet.create({
   },
   metricLabelEmphasis: {
     color: theme.colors.muted,
+  },
+  lightMetricRow: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+  },
+  lightMetric: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 74,
+    minWidth: 0,
+    padding: theme.spacing.md,
+  },
+  lightMetricCompact: {
+    flex: 0,
+    minHeight: 66,
+    minWidth: 82,
+  },
+  lightMetricEmphasis: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+  },
+  lightMetricValue: {
+    color: theme.colors.ink,
+    fontSize: theme.typography.heading,
+    fontWeight: "900",
+    lineHeight: 24,
+  },
+  lightMetricValueWrap: {
+    fontSize: 22,
+    lineHeight: 24,
+  },
+  lightMetricValueEmphasis: {
+    color: theme.colors.primary,
+  },
+  lightMetricLabel: {
+    color: theme.colors.muted,
+    fontSize: theme.typography.caption,
+    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: theme.spacing.xs,
   },
   quickActions: {
     flexDirection: "row",
@@ -4943,7 +5859,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.ink,
-    fontSize: theme.typography.body,
+    fontSize: theme.typography.sectionHeading,
     fontWeight: "900",
     marginBottom: theme.spacing.sm,
   },
@@ -4960,8 +5876,12 @@ const styles = StyleSheet.create({
   scanningForCard: {
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.lg,
+    gap: theme.spacing.md,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.md,
+  },
+  scanContextStatusRow: {
+    alignItems: "flex-start",
   },
   scanIdentityLabel: {
     color: "#BFE7EA",
@@ -5033,6 +5953,7 @@ const styles = StyleSheet.create({
   },
   scanCartHeader: {
     alignItems: "flex-start",
+    flexWrap: "wrap",
     flexDirection: "row",
     gap: theme.spacing.md,
     justifyContent: "space-between",
@@ -5133,6 +6054,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
     ...theme.shadow,
+  },
+  resultHeaderBlock: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    width: "100%",
+  },
+  resultHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   resultIconSuccess: {
     alignItems: "center",
@@ -5242,7 +6173,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: theme.colors.ink,
-    fontSize: theme.typography.body,
+    fontSize: theme.typography.cardTitle,
     fontWeight: "900",
     lineHeight: 20,
   },
@@ -5275,7 +6206,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: theme.touch.compact,
     paddingHorizontal: theme.spacing.md,
   },
   siteChipSelected: {
@@ -5311,13 +6242,36 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: theme.spacing.sm,
   },
+  siteBadgeRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  siteDetailHeroCard: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: "#BFE7EA",
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
   siteDetailHeader: {
     alignItems: "flex-start",
-    borderBottomColor: theme.colors.line,
-    borderBottomWidth: 1,
+    flexDirection: "row",
     gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    paddingBottom: theme.spacing.md,
+    justifyContent: "space-between",
+  },
+  siteDetailHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  siteDetailTitle: {
+    color: theme.colors.ink,
+    fontSize: theme.typography.body,
+    fontWeight: "900",
+    lineHeight: 21,
   },
   detailHeader: {
     alignItems: "flex-start",
@@ -5326,6 +6280,29 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.md,
     paddingBottom: theme.spacing.md,
+  },
+  detailHeroCard: {
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  detailHeroTitle: {
+    color: theme.colors.ink,
+    flexShrink: 1,
+    fontSize: theme.typography.cardTitle,
+    fontWeight: "900",
+    lineHeight: 20,
+  },
+  detailNoticeInline: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    padding: theme.spacing.md,
   },
   rowActions: {
     alignItems: "center",
@@ -5338,7 +6315,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: theme.touch.control,
     paddingHorizontal: theme.spacing.md,
   },
   archiveText: {
@@ -5372,6 +6349,36 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginTop: theme.spacing.md,
     padding: theme.spacing.md,
+  },
+  ledgerMarker: {
+    alignItems: "center",
+    borderRadius: theme.radius.sm,
+    height: 40,
+    justifyContent: "center",
+    width: 44,
+  },
+  ledgerMarkerPositive: {
+    backgroundColor: theme.colors.successSoft,
+  },
+  ledgerMarkerWarning: {
+    backgroundColor: theme.colors.warningSoft,
+  },
+  ledgerMarkerDanger: {
+    backgroundColor: theme.colors.dangerSoft,
+  },
+  ledgerMarkerNeutral: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  ledgerMarkerText: {
+    color: theme.colors.success,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  ledgerMarkerTextWarning: {
+    color: theme.colors.danger,
+  },
+  ledgerMarkerTextNeutral: {
+    color: theme.colors.muted,
   },
   historyMarker: {
     alignItems: "center",
@@ -5452,7 +6459,6 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.xs,
     borderWidth: 1,
     paddingHorizontal: theme.spacing.sm,
@@ -5461,6 +6467,79 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 10,
     fontWeight: "900",
+  },
+  stateCard: {
+    alignItems: "flex-start",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    padding: theme.spacing.md,
+  },
+  stateCardCompact: {
+    borderRadius: theme.radius.md,
+    marginVertical: 0,
+    padding: theme.spacing.sm,
+  },
+  stateCardCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  stateCardTitle: {
+    color: theme.colors.ink,
+    flexShrink: 1,
+    fontSize: theme.typography.cardTitle,
+    fontWeight: "900",
+    lineHeight: 20,
+  },
+  stateCardBody: {
+    color: theme.colors.muted,
+    flexShrink: 1,
+    fontSize: theme.typography.small,
+    lineHeight: 19,
+    marginTop: theme.spacing.xs,
+  },
+  stateGlyph: {
+    alignItems: "center",
+    borderRadius: theme.radius.pill,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  stateGlyphCompact: {
+    height: 36,
+    width: 36,
+  },
+  stateGlyphSuccess: {
+    backgroundColor: theme.colors.successSoft,
+  },
+  stateGlyphWarning: {
+    backgroundColor: theme.colors.warningSoft,
+  },
+  stateGlyphDanger: {
+    backgroundColor: theme.colors.dangerSoft,
+  },
+  stateGlyphMuted: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  stateGlyphText: {
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  stateGlyphTextSuccess: {
+    color: theme.colors.success,
+  },
+  stateGlyphTextWarning: {
+    color: theme.colors.warning,
+  },
+  stateGlyphTextDanger: {
+    color: theme.colors.danger,
+  },
+  stateGlyphTextMuted: {
+    color: theme.colors.muted,
   },
   emptyText: {
     color: theme.colors.muted,

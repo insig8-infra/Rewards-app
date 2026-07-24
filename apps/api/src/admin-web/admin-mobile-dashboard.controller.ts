@@ -16,6 +16,6 @@ export class AdminMobileDashboardController {
   getDashboard(
     @CurrentActor() actor: AuthenticatedActor,
   ): ReturnType<AdminWebDashboardService["getDashboard"]> {
-    return this.dashboard.getDashboard(actor.role);
+    return this.dashboard.getDashboard(actor);
   }
 }

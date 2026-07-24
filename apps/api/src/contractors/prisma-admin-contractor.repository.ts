@@ -3,6 +3,7 @@ import { formatContractorCode } from "@volt-rewards/domain";
 import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
 import type { Contractor, Site, User } from "../generated/prisma/client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { summarizeSuccessfulScans } from "./admin-contractor-analytics.js";
 import type {
   AdminContractorDetail,
   AdminContractorPatchInput,
@@ -16,6 +17,8 @@ import type {
 type ContractorWithUserAndCounts = Contractor & {
   readonly user: User;
   readonly sites: readonly ContractorSummarySite[];
+  readonly scanAttempts: readonly ContractorScanAttemptForAdmin[];
+  readonly rewardClaims: readonly FulfilledRewardClaimForAdmin[];
   readonly _count: {
     readonly sites: number;
     readonly scanAttempts: number;
@@ -41,10 +44,20 @@ type SiteScanAttemptForAdmin = {
   readonly creditedPoints: number | null;
   readonly qrUnit: {
     readonly points: number;
+    readonly productSku: string | null;
     readonly invoiceLine: {
       readonly productName: string;
+      readonly rawSource: unknown;
     } | null;
   } | null;
+};
+
+type ContractorScanAttemptForAdmin = SiteScanAttemptForAdmin;
+
+type FulfilledRewardClaimForAdmin = {
+  readonly rewardItem: {
+    readonly cashValueInr: number;
+  };
 };
 
 @Injectable()
@@ -70,6 +83,8 @@ export class PrismaAdminContractorRepository implements AdminContractorRepositor
           },
           orderBy: { createdAt: "desc" },
         },
+        scanAttempts: successfulScanAttemptInclude,
+        rewardClaims: fulfilledRewardClaimInclude,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -91,14 +106,17 @@ export class PrismaAdminContractorRepository implements AdminContractorRepositor
                 qrUnit: {
                   select: {
                     points: true,
+                    productSku: true,
                     invoiceLine: {
                       select: {
                         productName: true,
+                        rawSource: true,
                       },
                     },
                   },
                 },
               },
+              where: { result: "SUCCESS" },
               orderBy: { createdAt: "desc" },
             },
             _count: {
@@ -116,6 +134,8 @@ export class PrismaAdminContractorRepository implements AdminContractorRepositor
             rewardClaims: true,
           },
         },
+        scanAttempts: successfulScanAttemptInclude,
+        rewardClaims: fulfilledRewardClaimInclude,
       },
     });
 
@@ -144,6 +164,8 @@ export class PrismaAdminContractorRepository implements AdminContractorRepositor
               },
               orderBy: { createdAt: "desc" },
             },
+            scanAttempts: successfulScanAttemptInclude,
+            rewardClaims: fulfilledRewardClaimInclude,
           },
         },
       },
@@ -385,6 +407,12 @@ export class PrismaAdminContractorRepository implements AdminContractorRepositor
 }
 
 function mapContractorSummary(contractor: ContractorWithUserAndCounts): AdminContractorSummary {
+  const scanSummary = summarizeSuccessfulScans(contractor.scanAttempts);
+  const fulfilledRewardValueInr = contractor.rewardClaims.reduce(
+    (total, claim) => total + claim.rewardItem.cashValueInr,
+    0,
+  );
+
   return {
     contractorId: contractor.id,
     userId: contractor.userId,
@@ -399,7 +427,11 @@ function mapContractorSummary(contractor: ContractorWithUserAndCounts): AdminCon
     availablePoints: contractor.availablePoints,
     siteCount: contractor._count.sites,
     scanCount: contractor._count.scanAttempts,
+    successfulScanCount: scanSummary.successfulScanCount,
+    scannedBusinessInr: scanSummary.scannedBusinessInr,
     rewardClaimCount: contractor._count.rewardClaims,
+    fulfilledRewardCount: contractor.rewardClaims.length,
+    fulfilledRewardValueInr,
     siteSummary: summarizeSites(contractor.sites),
     citySummary: summarizeCities(contractor.sites),
     createdAt: contractor.createdAt,
@@ -418,6 +450,7 @@ function mapSite(site: SiteWithCounts): AdminContractorSite {
   const qrValuePoints = site.scanAttempts.reduce((total, attempt) => total + (attempt.qrValuePoints ?? attempt.qrUnit?.points ?? 0), 0);
   const creditedPoints = site.scanAttempts.reduce((total, attempt) => total + (attempt.creditedPoints ?? 0), 0);
   const productSummary = summarizeProducts(site.scanAttempts.map((attempt) => attempt.qrUnit?.invoiceLine?.productName ?? null));
+  const scanSummary = summarizeSuccessfulScans(site.scanAttempts);
 
   return {
     siteId: site.id,
@@ -428,11 +461,46 @@ function mapSite(site: SiteWithCounts): AdminContractorSite {
     ...(site.city ? { city: site.city } : {}),
     status: site.status,
     scanCount: site._count.scanAttempts,
+    successfulScanCount: scanSummary.successfulScanCount,
     qrValuePoints,
     creditedPoints,
+    scannedBusinessInr: scanSummary.scannedBusinessInr,
     productSummary,
+    scannedItems: scanSummary.scannedItems,
   };
 }
+
+const successfulScanAttemptInclude = {
+  where: { result: "SUCCESS" },
+  select: {
+    qrValuePoints: true,
+    creditedPoints: true,
+    qrUnit: {
+      select: {
+        points: true,
+        productSku: true,
+        invoiceLine: {
+          select: {
+            productName: true,
+            rawSource: true,
+          },
+        },
+      },
+    },
+  },
+  orderBy: { createdAt: "desc" },
+} as const;
+
+const fulfilledRewardClaimInclude = {
+  where: { status: "FULFILLED" },
+  select: {
+    rewardItem: {
+      select: {
+        cashValueInr: true,
+      },
+    },
+  },
+} as const;
 
 function summarizeSites(sites: readonly ContractorSummarySite[]): string {
   const labels = uniqueNonEmpty(sites.flatMap((site) => [site.clientName, site.area]).slice(0, 8));

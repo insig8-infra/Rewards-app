@@ -133,7 +133,7 @@ button:disabled {
   background: var(--panel-soft);
   padding: 4px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -730,6 +730,12 @@ button:disabled {
   background-position: center;
   background-size: cover;
   overflow: hidden;
+}
+
+.promotion-preview.image-only {
+  background-color: #ffffff;
+  background-position: center;
+  background-size: cover;
 }
 
 .promotion-preview-shade {
@@ -1358,6 +1364,72 @@ button:disabled {
   gap: 8px;
 }
 
+.sticker-status {
+  padding: 0 14px 14px;
+}
+
+.sticker-sheet {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.sticker-label {
+  width: 2in;
+  min-height: 1in;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 6px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 0.72in minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  break-inside: avoid;
+}
+
+.sticker-qr {
+  width: 0.72in;
+  height: 0.72in;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sticker-qr img {
+  display: block;
+  width: 0.68in;
+  height: 0.68in;
+}
+
+.sticker-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.sticker-copy strong {
+  color: var(--brand);
+  font-size: 15px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.sticker-copy span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .totals-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1655,9 +1727,13 @@ button:disabled {
   border-bottom: 1px solid var(--line);
   padding: 14px 16px;
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(160px, 0.55fr) minmax(180px, 0.65fr) minmax(160px, 0.55fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(132px, 0.65fr) minmax(148px, 0.75fr);
   gap: 10px;
   align-items: center;
+}
+
+.control-bar > * {
+  min-width: 0;
 }
 
 .control-bar .input-shell .text-input {
@@ -2285,7 +2361,15 @@ button:disabled {
     min-height: 72px;
     align-items: flex-start;
     flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
     padding: 18px;
+  }
+
+  .topbar > div:first-child,
+  .topbar .toolbar {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .mobile-nav {
@@ -2297,16 +2381,32 @@ button:disabled {
   }
 
   .content {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
     padding: 18px;
+  }
+
+  .content > *,
+  .stack > *,
+  .reports-main-stack > * {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .page-intro {
     align-items: stretch;
     flex-direction: column;
+    min-width: 0;
   }
 
   .page-intro-actions {
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  .page-intro-actions .button {
+    min-width: 0;
   }
 
   .summary-grid,
@@ -2328,12 +2428,33 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .page-intro h2,
+  .panel-title,
+  .metric-label,
+  .metric-value {
+    overflow-wrap: anywhere;
+  }
+
+  .report-tab-list {
+    grid-template-columns: 1fr;
+  }
+
+  .report-table {
+    min-width: 760px;
+  }
+
+  .data-table-wrap,
+  .report-table-wrap {
+    max-width: 100%;
+  }
+
   .report-search-field {
     grid-column: auto;
   }
 
   .line-row,
   .print-row,
+  .sticker-label,
   .history-row,
   .activity-row,
   .directory-row,
@@ -2355,5 +2476,135 @@ button:disabled {
   .directory-row .ledger-facts,
   .directory-row > .status {
     grid-column: auto;
+  }
+}
+
+@media print {
+  @page {
+    size: 2in 1in;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .printable-sticker-sheet,
+  .printable-sticker-sheet * {
+    visibility: visible !important;
+  }
+
+  .printable-sticker-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 2in;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 2in;
+    gap: 0;
+    align-items: start;
+    background: #ffffff;
+  }
+
+  .sticker-label {
+    width: 2in;
+    height: 1in;
+    min-height: 1in;
+    border: 0;
+    border-radius: 0;
+    padding: 0.08in;
+    background: #ffffff;
+    grid-template-columns: 0.7in minmax(0, 1fr);
+    gap: 0.08in;
+    color: #111827;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .sticker-qr {
+    width: 0.7in;
+    height: 0.7in;
+    border: 0;
+  }
+
+  .sticker-qr img {
+    width: 0.7in;
+    height: 0.7in;
+  }
+
+  .sticker-copy {
+    display: flex;
+    align-items: center;
+    font-size: 10pt;
+    font-weight: 800;
+    line-height: 1.05;
+    color: #111827;
+  }
+
+  .sticker-copy strong {
+    color: #111827;
+    font-size: 10pt;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar {
+    padding: 14px;
+  }
+
+  .topbar h1 {
+    font-size: 20px;
+  }
+
+  .topbar .toolbar {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .topbar .toolbar .badge,
+  .topbar .toolbar .button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .content {
+    padding: 14px;
+  }
+
+  .page-intro {
+    padding: 14px;
+  }
+
+  .page-intro h2 {
+    font-size: 18px;
+  }
+
+  .reports-page-intro .page-intro-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-page-intro .page-intro-actions .button:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .reports-page-intro .page-intro-actions .button {
+    max-width: 100%;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .reports-page-intro .page-intro-actions .button svg {
+    flex: 0 0 auto;
+  }
+
+  .report-table {
+    min-width: 680px;
   }
 }

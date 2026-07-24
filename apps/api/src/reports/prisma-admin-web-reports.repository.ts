@@ -333,6 +333,7 @@ export class PrismaAdminWebReportsRepository implements AdminWebReportsRepositor
       .map((contractor) => {
         const successfulScanCount = contractor.scanAttempts.filter((attempt) => attempt.result === "SUCCESS").length;
         const deliveredRewards = contractor.rewardClaims.filter((claim) => claim.status === "FULFILLED").length;
+        const pointsUsed = contractor.rewardClaims.reduce((total, claim) => total + claim.pointsDeducted, 0);
         const lastScan = contractor.scanAttempts.map((attempt) => attempt.createdAt).sort((left, right) => right.getTime() - left.getTime())[0];
         return {
           contractorId: contractor.id,
@@ -343,12 +344,13 @@ export class PrismaAdminWebReportsRepository implements AdminWebReportsRepositor
           tier: contractor.tier ?? "",
           totalAccumulatedPoints: contractor.totalAccumulatedPoints,
           pointsAvailable: contractor.availablePoints,
+          pointsUsed,
           scanCount: contractor.scanAttempts.length,
           successfulScanCount,
           rewardClaimsRaised: contractor.rewardClaims.length,
           rewardsDelivered: deliveredRewards,
           lastScanDateTime: formatDateTime(lastScan),
-          citySite: summarize(contractor.sites.map((site) => site.city ?? site.clientName)),
+          area: contractor.belongsToNote?.trim() || summarize(contractor.sites.map((site) => site.area ?? site.clientName)),
         };
       })
       .sort((left, right) => right.totalAccumulatedPoints - left.totalAccumulatedPoints)
@@ -361,6 +363,7 @@ export class PrismaAdminWebReportsRepository implements AdminWebReportsRepositor
       summary: [
         sum("Contractors", rows.length),
         sum("Successful scans", sumNumber(rows, "successfulScanCount")),
+        sum("Points used", sumNumber(rows, "pointsUsed")),
         sum("Reward claims", sumNumber(rows, "rewardClaimsRaised")),
       ],
       columns: contractorLeaderboardColumns,
@@ -564,13 +567,14 @@ const contractorLeaderboardColumns = columns([
   ["contractorCode", "Code"],
   ["tier", "Tier"],
   ["totalAccumulatedPoints", "Lifetime Points", "right"],
-  ["pointsAvailable", "Available", "right"],
+  ["pointsAvailable", "Current Balance", "right"],
+  ["pointsUsed", "Points Used", "right"],
   ["scanCount", "Scans", "right"],
   ["successfulScanCount", "Successful", "right"],
   ["rewardClaimsRaised", "Claims", "right"],
   ["rewardsDelivered", "Delivered", "right"],
   ["lastScanDateTime", "Last Scan"],
-  ["citySite", "City/Site"],
+  ["area", "Area"],
 ]);
 
 const qrStatusColumns = columns([

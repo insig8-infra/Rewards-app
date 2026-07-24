@@ -1,6 +1,8 @@
+import { normalizeNetworkError } from "./offline";
+
 export const apiBaseUrl = process.env?.EXPO_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3000/api";
 
-export type AdminRole = "OWNER" | "STAFF";
+export type AdminRole = "OWNER" | "ADMIN" | "STAFF";
 
 export interface AdminProfile {
   readonly userId: string;
@@ -196,6 +198,14 @@ export interface AdminReportResponse {
   readonly totalRows: number;
   readonly page: number;
   readonly pageSize: number;
+}
+
+export type AdminReportExportFormat = "CSV" | "PDF";
+
+export interface AdminReportDownload {
+  readonly fileName: string;
+  readonly contentType: string;
+  readonly byteLength: number;
 }
 
 export interface ReturnQrClaimImpact {
@@ -478,6 +488,43 @@ export async function getReport(token: string, reportId: AdminReportId): Promise
   });
 }
 
+export async function downloadReport(
+  token: string,
+  reportId: AdminReportId,
+  format: AdminReportExportFormat,
+): Promise<AdminReportDownload> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/admin-mobile/reports/${encodeURIComponent(reportId)}/export`, {
+      method: "POST",
+      headers: {
+        ...bearerHeaders(token),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ format }),
+    });
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => undefined);
+    const error = new Error(extractErrorMessage(payload, response.status)) as ApiError;
+    Object.defineProperty(error, "status", { value: response.status });
+    throw error;
+  }
+
+  const contentType = response.headers.get("content-type") ?? (format === "PDF" ? "application/pdf" : "text/csv");
+  const fileName = parseDownloadFileName(response.headers.get("content-disposition")) ?? `${reportId}.${format.toLowerCase()}`;
+  const bytes = await response.arrayBuffer();
+  triggerBrowserDownload(fileName, contentType, bytes);
+  return {
+    fileName,
+    contentType,
+    byteLength: bytes.byteLength,
+  };
+}
+
 export async function lookupReturnQr(token: string, qrToken: string): Promise<ReturnQrLookupResponse> {
   return request<ReturnQrLookupResponse>("/admin-mobile/return-qr/lookup", {
     method: "POST",
@@ -613,10 +660,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...(init.body !== undefined ? { "content-type": "application/json" } : {}),
     ...(init.headers ?? {}),
   };
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
   const payload = await response.json().catch(() => undefined);
 
   if (!response.ok) {
@@ -649,4 +701,25 @@ function extractErrorMessage(payload: unknown, status: number): string {
   }
 
   return `Request failed with status ${status}.`;
+}
+
+function parseDownloadFileName(contentDisposition: string | null): string | undefined {
+  const match = contentDisposition?.match(/filename="([^"]+)"/i);
+  return match?.[1];
+}
+
+function triggerBrowserDownload(fileName: string, contentType: string, bytes: ArrayBuffer): void {
+  if (typeof window === "undefined" || typeof document === "undefined" || typeof URL === "undefined") {
+    return;
+  }
+
+  const blob = new Blob([bytes], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

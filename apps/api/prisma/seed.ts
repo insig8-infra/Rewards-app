@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { getRuntimeDatabaseUrl } from "../src/env/database-connection.js";
 import { loadApiEnv } from "../src/env/load-api-env.js";
 import { PrismaClient } from "../src/generated/prisma/client.js";
-import { uploadRewardImageToStorage } from "../src/storage/supabase-storage.js";
+import { uploadRewardImageToStorage } from "../src/storage/media-storage.js";
 
 loadApiEnv();
 
@@ -117,6 +117,44 @@ async function main(): Promise<void> {
     update: {
       pinHash: seedAdminPinHash("2222"),
       createdByOwnerId: devOwner.id,
+    },
+  });
+
+  const devAdmin = await prisma.user.upsert({
+    where: { id: "dev-admin-user" },
+    create: {
+      id: "dev-admin-user",
+      role: "ADMIN",
+      mobileNumber: "9000000093",
+      displayName: "Rohit Iyer",
+      pinHash: seedAdminPinHash("3333"),
+      staffProfile: {
+        create: {
+          pinHash: seedAdminPinHash("3333"),
+          createdByOwnerId: devOwner.id,
+        },
+      },
+    },
+    update: {
+      role: "ADMIN",
+      mobileNumber: "9000000093",
+      displayName: "Rohit Iyer",
+      pinHash: seedAdminPinHash("3333"),
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.staffProfile.upsert({
+    where: { userId: devAdmin.id },
+    create: {
+      userId: devAdmin.id,
+      pinHash: seedAdminPinHash("3333"),
+      createdByOwnerId: devOwner.id,
+    },
+    update: {
+      pinHash: seedAdminPinHash("3333"),
+      createdByOwnerId: devOwner.id,
+      deactivatedAt: null,
     },
   });
 
@@ -276,8 +314,10 @@ async function main(): Promise<void> {
     rewardItemId: "reward-wire-stripper-kit",
     pointsDeducted: 850,
     totalAccumulatedPoints: 2500,
-    availablePointsAfterClaim: 1650,
+    availablePointsAfterClaim: 2500,
     chosenAt: new Date("2026-07-07T09:05:00.000Z"),
+    status: "CANCELLED_BY_CONTRACTOR",
+    cancelledAt: new Date("2026-07-07T09:08:00.000Z"),
   });
 
   await prisma.site.upsert({
@@ -323,35 +363,107 @@ async function main(): Promise<void> {
   const lineInputs = [
     {
       externalLineId: "busy-inv-1001-line-1",
-      sku: "HAVELLS-WIRE-1.5SQMM-RED",
-      productName: "Havells Copper Wire 1.5 sq mm Red",
+      sku: "HAV-LIFE-1.5-RED-90M",
+      productName: "Havells Life Line Plus S3 HRFR 1.5 sq mm Wire Red 90m",
       category: "Wire",
       quantity: 6,
       returnedQty: 0,
-      pointsPerUnit: 30,
+      pointsPerUnit: 100,
     },
     {
       externalLineId: "busy-inv-1001-line-2",
-      sku: "ATOMBERG-RENESA-FAN",
-      productName: "Atomberg Renesa Ceiling Fan",
+      sku: "ATM-RENESA-1200-IVORY",
+      productName: "Atomberg Renesa 1200mm BLDC Ceiling Fan Ivory",
       category: "Fans",
       quantity: 4,
       returnedQty: 1,
-      pointsPerUnit: 50,
+      pointsPerUnit: 150,
     },
     {
       externalLineId: "busy-inv-1001-line-3",
-      sku: "WIPRO-LED-9W",
-      productName: "Wipro LED Bulb 9W Cool White",
-      category: "Lights",
-      quantity: 10,
+      sku: "WIP-GARNET-12W-B22",
+      productName: "Wipro Garnet 12W LED Bulb B22 Cool Daylight",
+      category: "Bulbs",
+      quantity: 20,
       returnedQty: 0,
       pointsPerUnit: 20,
     },
   ];
 
+  await prisma.qrToken.deleteMany({
+    where: {
+      qrUnit: {
+        invoiceId: invoice.id,
+        status: {
+          in: ["NOT_PRINTED", "PRINTED_UNCLAIMED", "REPRINTED", "CANCELLED"],
+        },
+      },
+    },
+  });
+
+  await prisma.qrUnit.updateMany({
+    where: {
+      invoiceId: invoice.id,
+      status: {
+        in: ["NOT_PRINTED", "PRINTED_UNCLAIMED", "REPRINTED", "CANCELLED"],
+      },
+    },
+    data: {
+      status: "NOT_PRINTED",
+      expiresAt: null,
+      printedAt: null,
+      reservedAt: null,
+      reservedCartId: null,
+      scannedAt: null,
+      claimedByContractorId: null,
+      siteId: null,
+      printedByUserId: null,
+      replacementForQrUnitId: null,
+    },
+  });
+
   let nextUnitIndex = await getNextUnitIndex(invoice.id);
   for (const lineInput of lineInputs) {
+    await prisma.itemCode.upsert({
+      where: { tempItemCode: lineInput.sku },
+      create: {
+        tempItemCode: lineInput.sku,
+        itemName: lineInput.productName,
+        productCategory: lineInput.category,
+        price: String(lineInput.pointsPerUnit * 10),
+        fixedPoints: lineInput.pointsPerUnit,
+        percentOfPricePoints: null,
+        status: "IN_USE",
+        busyActive: true,
+        lastBusySyncAt: new Date("2026-06-20T00:00:00.000Z"),
+        sourcePriceField: "Price",
+        rawSource: {
+          source: "seed-busy-invoice",
+          tmpItemCode: lineInput.sku,
+          itemName: lineInput.productName,
+          price: String(lineInput.pointsPerUnit * 10),
+        },
+      },
+      update: {
+        itemName: lineInput.productName,
+        productCategory: lineInput.category,
+        price: String(lineInput.pointsPerUnit * 10),
+        fixedPoints: lineInput.pointsPerUnit,
+        percentOfPricePoints: null,
+        status: "IN_USE",
+        busyActive: true,
+        lastBusySyncAt: new Date("2026-06-20T00:00:00.000Z"),
+        missingSince: null,
+        sourcePriceField: "Price",
+        rawSource: {
+          source: "seed-busy-invoice",
+          tmpItemCode: lineInput.sku,
+          itemName: lineInput.productName,
+          price: String(lineInput.pointsPerUnit * 10),
+        },
+      },
+    });
+
     const line = await prisma.busyInvoiceLine.upsert({
       where: {
         invoiceId_externalLineId: {
@@ -370,6 +482,18 @@ async function main(): Promise<void> {
       where: {
         invoiceId: invoice.id,
         invoiceLineId: line.id,
+      },
+    });
+
+    await prisma.qrUnit.updateMany({
+      where: {
+        invoiceId: invoice.id,
+        invoiceLineId: line.id,
+        status: "NOT_PRINTED",
+      },
+      data: {
+        productSku: lineInput.sku,
+        points: lineInput.pointsPerUnit,
       },
     });
 
@@ -399,7 +523,8 @@ async function seedPromotions(): Promise<void> {
       body: "Earn extra rewards on Havells wires, Wipro bulbs, and Atomberg fans this week.",
       assetUrl: "https://placehold.co/1200x640/00535b/ffffff.jpg?text=Volt+Rewards+Sale",
       assetAltText: "Volt Rewards new sale banner",
-      overlayText: "NEW SALE IS ON!",
+      overlayText: null,
+      backgroundColor: "#00535B",
       overlayTextColor: "#FFFFFF",
       overlayFontSize: 28,
       overlayFontStyle: "bold",
@@ -412,7 +537,8 @@ async function seedPromotions(): Promise<void> {
       body: "Earn extra rewards on Havells wires, Wipro bulbs, and Atomberg fans this week.",
       assetUrl: "https://placehold.co/1200x640/00535b/ffffff.jpg?text=Volt+Rewards+Sale",
       assetAltText: "Volt Rewards new sale banner",
-      overlayText: "NEW SALE IS ON!",
+      overlayText: null,
+      backgroundColor: "#00535B",
       overlayTextColor: "#FFFFFF",
       overlayFontSize: 28,
       overlayFontStyle: "bold",
@@ -431,7 +557,8 @@ async function seedPromotions(): Promise<void> {
       body: "This expired promotion should remain hidden from mobile dashboards.",
       assetUrl: "https://placehold.co/1200x640/d8eee9/00535b.jpg?text=Expired+Offer",
       assetAltText: "Expired offer banner",
-      overlayText: "Expired Offer",
+      overlayText: null,
+      backgroundColor: "#D8EEE9",
       overlayTextColor: "#00535B",
       overlayFontSize: 24,
       overlayFontStyle: "bold",
@@ -444,7 +571,8 @@ async function seedPromotions(): Promise<void> {
       body: "This expired promotion should remain hidden from mobile dashboards.",
       assetUrl: "https://placehold.co/1200x640/d8eee9/00535b.jpg?text=Expired+Offer",
       assetAltText: "Expired offer banner",
-      overlayText: "Expired Offer",
+      overlayText: null,
+      backgroundColor: "#D8EEE9",
       overlayTextColor: "#00535B",
       overlayFontSize: 24,
       overlayFontStyle: "bold",
@@ -463,7 +591,8 @@ async function seedPromotions(): Promise<void> {
       body: "Archived promotions should stay in Admin Web history only.",
       assetUrl: "https://placehold.co/1200x640/f7f4ea/00535b.jpg?text=Archived+Offer",
       assetAltText: "Archived offer banner",
-      overlayText: "Archived",
+      overlayText: null,
+      backgroundColor: "#F7F4EA",
       overlayTextColor: "#00535B",
       overlayFontSize: 22,
       overlayFontStyle: "regular",
@@ -476,7 +605,8 @@ async function seedPromotions(): Promise<void> {
       body: "Archived promotions should stay in Admin Web history only.",
       assetUrl: "https://placehold.co/1200x640/f7f4ea/00535b.jpg?text=Archived+Offer",
       assetAltText: "Archived offer banner",
-      overlayText: "Archived",
+      overlayText: null,
+      backgroundColor: "#F7F4EA",
       overlayTextColor: "#00535B",
       overlayFontSize: 22,
       overlayFontStyle: "regular",
@@ -509,7 +639,11 @@ async function seedRewardClaimScenario(input: {
   readonly totalAccumulatedPoints: number;
   readonly availablePointsAfterClaim: number;
   readonly chosenAt: Date;
+  readonly status?: "CHOSEN" | "CANCELLED_BY_CONTRACTOR";
+  readonly cancelledAt?: Date;
 }): Promise<void> {
+  const claimStatus = input.status ?? "CHOSEN";
+  const redeemedBalance = input.totalAccumulatedPoints - input.pointsDeducted;
   const user = await prisma.user.upsert({
     where: { id: input.userId },
     create: {
@@ -552,17 +686,18 @@ async function seedRewardClaimScenario(input: {
       claimId: input.claimId,
       contractorId: contractor.id,
       rewardItemId: input.rewardItemId,
-      status: "CHOSEN",
+      status: claimStatus,
       pointsDeducted: input.pointsDeducted,
       chosenAt: input.chosenAt,
+      cancelledAt: input.cancelledAt ?? null,
     },
     update: {
       contractorId: contractor.id,
       rewardItemId: input.rewardItemId,
-      status: "CHOSEN",
+      status: claimStatus,
       pointsDeducted: input.pointsDeducted,
       chosenAt: input.chosenAt,
-      cancelledAt: null,
+      cancelledAt: input.cancelledAt ?? null,
       fulfilledAt: null,
       fulfilledByOwnerId: null,
       otpVerifiedAt: null,
@@ -579,7 +714,7 @@ async function seedRewardClaimScenario(input: {
       contractorId: contractor.id,
       type: "REWARD_REDEEM",
       pointsDelta: -input.pointsDeducted,
-      balanceAfter: input.availablePointsAfterClaim,
+      balanceAfter: claimStatus === "CANCELLED_BY_CONTRACTOR" ? redeemedBalance : input.availablePointsAfterClaim,
       sourceType: "REWARD_CLAIM",
       sourceId: claim.id,
       rewardClaimId: claim.id,
@@ -588,10 +723,36 @@ async function seedRewardClaimScenario(input: {
     },
     update: {
       contractorId: contractor.id,
-      balanceAfter: input.availablePointsAfterClaim,
+      balanceAfter: claimStatus === "CANCELLED_BY_CONTRACTOR" ? redeemedBalance : input.availablePointsAfterClaim,
       rewardClaimId: claim.id,
     },
   });
+
+  if (claimStatus === "CANCELLED_BY_CONTRACTOR") {
+    await prisma.pointsLedgerEntry.upsert({
+      where: { idempotencyKey: `seed-reward-cancel:${input.claimId}` },
+      create: {
+        contractorId: contractor.id,
+        type: "REWARD_CANCEL_RESTORE",
+        pointsDelta: input.pointsDeducted,
+        balanceAfter: input.availablePointsAfterClaim,
+        sourceType: "REWARD_CLAIM",
+        sourceId: claim.id,
+        rewardClaimId: claim.id,
+        idempotencyKey: `seed-reward-cancel:${input.claimId}`,
+        createdAt: input.cancelledAt ?? input.chosenAt,
+      },
+      update: {
+        contractorId: contractor.id,
+        balanceAfter: input.availablePointsAfterClaim,
+        rewardClaimId: claim.id,
+      },
+    });
+  } else {
+    await prisma.pointsLedgerEntry.deleteMany({
+      where: { idempotencyKey: `seed-reward-cancel:${input.claimId}` },
+    });
+  }
 }
 
 function rewardImageDataUri(label: string, background: string, accent: string): string {

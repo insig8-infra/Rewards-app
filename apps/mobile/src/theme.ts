@@ -44,11 +44,32 @@ export const theme = {
   },
   typography: {
     title: 28,
+    screenTitle: 26,
     heading: 20,
+    sectionHeading: 18,
+    cardTitle: 16,
     body: 15,
+    helper: 13,
     small: 13,
     caption: 12,
     metadata: 11,
+  },
+  touch: {
+    compact: 44,
+    control: 48,
+    primary: 52,
+    bottomTab: 76,
+  },
+  motion: {
+    pressMs: 120,
+    sheetMs: 220,
+    successMs: 420,
+  },
+  layout: {
+    minPhoneProofWidth: 360,
+    maxPhonePreviewWidth: 480,
+    screenGutter: 16,
+    rewardRailTileWidth: 214,
   },
   shadow: {
     boxShadow: "0px 5px 12px rgba(0, 61, 67, 0.08)",

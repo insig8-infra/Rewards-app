@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useNetInfo } from "@react-native-community/netinfo";
+import { Feather, type FeatherIconName } from "@react-native-vector-icons/feather";
 import {
   ActivityIndicator,
   type ColorValue,
@@ -14,6 +16,8 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
+import * as Font from "expo-font";
 import { NavigationContainer, useNavigation, useRoute } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -21,38 +25,32 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   getContractorDetail,
   getDashboard,
-  getReport,
   getReportsLanding,
   fulfillRewardClaim,
-  listRewardCatalog,
   listRewardClaimHistory,
   listRewardClaims,
   listContractors,
   listStaff,
   lookupRewardClaim,
   loginAdmin,
-  addRewardCatalogImage,
   cancelReturnQr,
   createContractor,
   createStaff,
   deactivateContractor,
-  createRewardCatalogItem,
-  deactivateRewardCatalogItem,
   deactivateStaff,
+  downloadReport,
   lookupReturnQr,
   reactivateContractor,
-  reactivateRewardCatalogItem,
   reactivateStaff,
   resetContractorMpin,
   resetStaffPin,
   reverseReturnQr,
   sendRewardFulfillmentOtp,
-  updateRewardCatalogItem,
   updateContractorPhoto,
   updateStaffPhoto,
   type AdminDashboard,
+  type AdminReportExportFormat,
   type AdminReportId,
-  type AdminReportResponse,
   type AdminReportsLanding,
   type AdminRole,
   type AdminRewardClaimHistoryEntry,
@@ -60,22 +58,26 @@ import {
   type ContractorResetMpinResponse,
   type ContractorDetail,
   type ContractorSummary,
-  type RewardCatalogItem,
-  type RewardCatalogStatus,
   type RewardFulfillmentOtpResponse,
   type ReturnQrLookupResponse,
   type ReturnQrMutationResponse,
   type StaffMutationResponse,
   type StaffSummary,
 } from "./src/api";
-import { tabsForRole } from "./src/roleNavigation";
+import { canUseManagerAction, tabsForRole } from "./src/roleNavigation";
+import { normalizeQrScannerData, shouldAcceptQrScannerData } from "./src/qrScanner";
+import { getRuntimeAdminMobileDevFeatures } from "./src/devFeatures";
 import { clearSession, getSession, saveSession, type StoredAdminSession } from "./src/storage";
 import { theme } from "./src/theme";
+import { isOfflineNetworkState, NO_INTERNET_MESSAGE } from "./src/offline";
+
+declare const require: (path: string) => number;
 
 type RootStackParamList = {
   Login: undefined;
   Tabs: undefined;
   ContractorDetail: { contractorId: string };
+  Staff: undefined;
 };
 
 type TabParamList = {
@@ -87,11 +89,10 @@ type TabParamList = {
 };
 
 type ReturnQrResult = ReturnQrLookupResponse | ReturnQrMutationResponse;
-type TabNavigation = {
-  navigate: (screen: keyof TabParamList) => void;
+type AdminNavigation = {
+  navigate: (screen: keyof TabParamList | "Staff") => void;
 };
-type AdminRewardSection = "CLAIMS" | "HISTORY" | "CATALOG";
-type AdminOperationsSection = "REPORTS" | "STAFF";
+type AdminRewardSection = "CLAIMS" | "HISTORY";
 
 interface PersonDraft {
   readonly name: string;
@@ -108,6 +109,11 @@ const emptyPersonDraft: PersonDraft = {
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 const maxDeviceImageBytes = 2 * 1024 * 1024;
+const seededAdminCredentials: Record<AdminRole, { readonly mobileNumber: string; readonly pin: string }> = {
+  OWNER: { mobileNumber: "9000000091", pin: "1111" },
+  ADMIN: { mobileNumber: "9000000093", pin: "3333" },
+  STAFF: { mobileNumber: "9000000092", pin: "2222" },
+};
 const allowedDeviceImageContentTypes = new Set(["image/png", "image/jpeg"]);
 const isWebRuntime = Platform.OS === "web";
 
@@ -121,9 +127,12 @@ const AdminContext = createContext<AdminContextValue | null>(null);
 
 export default function App() {
   useWebDocumentReset();
+  useFeatherFontReady();
 
   const [session, setSession] = useState<StoredAdminSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const netInfo = useNetInfo();
+  const isOffline = isOfflineNetworkState(netInfo);
 
   useEffect(() => {
     let mounted = true;
@@ -175,6 +184,7 @@ export default function App() {
     <SafeAreaProvider>
       <MobileBrowserShell>
         <AdminContext.Provider value={contextValue}>
+          {isOffline ? <OfflineBanner /> : null}
           <NavigationContainer>
             <RootStack.Navigator
               screenOptions={{
@@ -192,6 +202,11 @@ export default function App() {
                     component={ContractorDetailScreen}
                     options={{ title: "Contractor" }}
                   />
+                  <RootStack.Screen
+                    name="Staff"
+                    component={StaffScreen}
+                    options={{ title: "Staff" }}
+                  />
                 </>
               ) : (
                 <RootStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -201,6 +216,35 @@ export default function App() {
         </AdminContext.Provider>
       </MobileBrowserShell>
     </SafeAreaProvider>
+  );
+}
+
+function useFeatherFontReady(): void {
+  const [, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    Font.loadAsync({
+      Feather: require("@react-native-vector-icons/feather/fonts/Feather.ttf"),
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) {
+          setReady(true);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+}
+
+function OfflineBanner() {
+  return (
+    <View accessibilityRole="alert" style={styles.offlineBanner}>
+      <Text style={styles.offlineBannerText}>{NO_INTERNET_MESSAGE}</Text>
+    </View>
   );
 }
 
@@ -296,19 +340,62 @@ function AdminTabs() {
   );
 }
 
+function OperatorSummaryCard({
+  metrics,
+  onSignOut,
+  session,
+}: {
+  readonly metrics: AdminDashboard["metrics"] | undefined;
+  readonly onSignOut: () => void;
+  readonly session: StoredAdminSession | null;
+}) {
+  const role = session?.role ?? "STAFF";
+  const roleLabel = role === "OWNER" ? "Owner operations" : role === "ADMIN" ? "Admin operations" : "Staff operations";
+
+  return (
+    <View style={styles.operatorHeroCard}>
+      <View style={styles.operatorHeroTop}>
+        <View style={styles.adminIdentityRow}>
+          <View style={styles.operatorAvatar}>
+            <Text style={styles.operatorAvatarText}>{initials(session?.name ?? role)}</Text>
+          </View>
+          <View style={styles.operatorCopy}>
+            <Text style={styles.eyebrow}>{roleLabel}</Text>
+            <Text numberOfLines={2} style={styles.operatorName}>{session?.name ?? "Volt Admin"}</Text>
+            <Text numberOfLines={1} style={styles.muted}>{session?.mobileNumber ?? "Session pending"}</Text>
+          </View>
+        </View>
+        <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.smallButton}>
+          <Text style={styles.smallButtonText}>Logout</Text>
+        </Pressable>
+      </View>
+      <View style={styles.operatorHeroMetrics}>
+        <LightMetric label="QR total" value={String(metrics?.qrTotal ?? 0)} emphasis compact />
+        <LightMetric label="Claims" value={String(metrics?.rewardClaims ?? 0)} compact />
+        <LightMetric label={canUseManagerAction(role) ? "Staff" : "Access"} value={canUseManagerAction(role) ? String(metrics?.staff ?? 0) : "Read only"} compact />
+      </View>
+    </View>
+  );
+}
+
 function LoginScreen() {
   const { setSession } = useAdminContext();
+  const devFeatures = useMemo(() => getRuntimeAdminMobileDevFeatures(), []);
   const [role, setRole] = useState<AdminRole>("OWNER");
-  const [mobileNumber, setMobileNumber] = useState("9000000091");
-  const [pin, setPin] = useState("1111");
+  const [mobileNumber, setMobileNumber] = useState(() =>
+    devFeatures.prefillSeededAdminLogin ? seededAdminCredentials.OWNER.mobileNumber : "",
+  );
+  const [pin, setPin] = useState(() =>
+    devFeatures.prefillSeededAdminLogin ? seededAdminCredentials.OWNER.pin : "",
+  );
   const [showPin, setShowPin] = useState(false);
   const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "" });
   const [submitting, setSubmitting] = useState(false);
 
   function selectRole(nextRole: AdminRole) {
     setRole(nextRole);
-    setMobileNumber(nextRole === "OWNER" ? "9000000091" : "9000000092");
-    setPin(nextRole === "OWNER" ? "1111" : "2222");
+    setMobileNumber(devFeatures.prefillSeededAdminLogin ? seededAdminCredentials[nextRole].mobileNumber : "");
+    setPin(devFeatures.prefillSeededAdminLogin ? seededAdminCredentials[nextRole].pin : "");
     setStatus({ tone: "idle", message: "" });
   }
 
@@ -343,6 +430,7 @@ function LoginScreen() {
 
       <View style={styles.segment}>
         <SegmentButton active={role === "OWNER"} label="OWNER" onPress={() => selectRole("OWNER")} />
+        <SegmentButton active={role === "ADMIN"} label="ADMIN" onPress={() => selectRole("ADMIN")} />
         <SegmentButton active={role === "STAFF"} label="STAFF" onPress={() => selectRole("STAFF")} />
       </View>
 
@@ -378,7 +466,7 @@ function LoginScreen() {
 
 function DashboardScreen() {
   const { session, signOut } = useAdminContext();
-  const navigation = useNavigation() as TabNavigation;
+  const navigation = useNavigation() as AdminNavigation;
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "Loading dashboard" });
   const [refreshing, setRefreshing] = useState(false);
@@ -408,95 +496,93 @@ function DashboardScreen() {
   }
 
   const metrics = dashboard?.metrics;
+  const recentActivity = dashboard?.recentActivity ?? [];
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
 
   return (
     <ScreenFrame
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.color.primary} />}
     >
-      <View style={styles.topBar}>
-        <View style={styles.operatorCopy}>
-          <Text style={styles.eyebrow}>{session?.role}</Text>
-          <Text numberOfLines={1} style={styles.screenTitle}>{session?.name}</Text>
-          <Text numberOfLines={1} style={styles.muted}>{session?.mobileNumber}</Text>
-        </View>
-        <Pressable accessibilityRole="button" onPress={() => void signOut()} style={styles.smallButton}>
-          <Text style={styles.smallButtonText}>Logout</Text>
-        </Pressable>
-      </View>
+      <OperatorSummaryCard
+        metrics={metrics}
+        onSignOut={() => void signOut()}
+        session={session}
+      />
 
       <Pressable
         accessibilityLabel="Open Return Scan"
         accessibilityRole="button"
         onPress={() => navigation.navigate("ReturnScan")}
-        style={styles.heroPanel}
+        style={styles.dashboardHeroPanel}
       >
         <View style={styles.heroCopyColumn}>
-          <Text numberOfLines={1} style={styles.heroLabel}>Primary operation</Text>
+          <Text numberOfLines={1} style={styles.heroLabel}>Scan returned product</Text>
           <Text style={styles.heroTitle}>Return Scan</Text>
           <Text numberOfLines={2} style={styles.heroCopy}>Cancel unused QR or reverse points on returned products.</Text>
+          <View style={styles.heroStatusRow}>
+            <Text style={styles.heroStatusChip}>Camera-first</Text>
+            <Text style={styles.heroStatusChip}>Label removal required</Text>
+          </View>
         </View>
         <View style={styles.heroIconBadge}>
-          <Text style={styles.heroIconText}>QR</Text>
+          <Feather color="#FFFFFF" name="maximize" size={26} />
         </View>
       </Pressable>
 
       <View style={styles.metricGrid}>
         <MetricButton label="Contractors" value={metrics?.contractors ?? 0} detail="Open directory" onPress={() => navigation.navigate("Contractors")} />
         <MetricButton
-          disabled={session?.role !== "OWNER"}
+          disabled={!isManager}
           label="Staff"
           value={metrics?.staff ?? 0}
-          detail={session?.role === "OWNER" ? "Manage staff" : "Owner only"}
-          onPress={() => navigation.navigate("Reports")}
+          detail={isManager ? "Manage staff" : "Manager only"}
+          onPress={() => navigation.navigate("Staff")}
         />
         <MetricButton label="Claims" value={metrics?.rewardClaims ?? 0} detail="Open Claim Desk" onPress={() => navigation.navigate("Rewards")} />
-        <MetricButton label="Reversed" value={metrics?.qrReversed ?? 0} detail="Return Scan" onPress={() => navigation.navigate("ReturnScan")} />
+        <MetricButton label="Scanned QR" value={metrics?.qrScanned ?? 0} detail="Open reports" onPress={() => navigation.navigate("Reports")} />
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>QR status</Text>
-      </View>
-      <View style={styles.statusStrip}>
-        <StatusPill label="Not printed" value={metrics?.qrNotPrinted ?? 0} tone="muted" />
-        <StatusPill label="Printed" value={metrics?.qrPrinted ?? 0} tone="warning" />
-        <StatusPill label="Scanned" value={metrics?.qrScanned ?? 0} tone="success" />
-        <StatusPill label="Cancelled" value={metrics?.qrCancelled ?? 0} tone="danger" />
-      </View>
+      <CompactQrStatus metrics={metrics} />
 
-      {session?.role === "OWNER" ? (
+      {isManager ? (
         <View style={styles.actionBand}>
-          <Text style={styles.sectionTitle}>Owner controls</Text>
+          <Text style={styles.sectionTitle}>Manager actions</Text>
           <DashboardActionCard
             eyebrow="Claim Desk"
+            iconName="award"
             title="Fulfill rewards"
             body="Send OTP, verify active claim, and mark Delivered."
             onPress={() => navigation.navigate("Rewards")}
           />
           <DashboardActionCard
-            eyebrow="Directory"
-            title="Contractors"
-            body="Review contractor profiles, sites, points, and photos."
-            onPress={() => navigation.navigate("Contractors")}
+            eyebrow="Team"
+            iconName="user-plus"
+            title="Staff"
+            body="Create staff, reset PINs, and manage active status."
+            onPress={() => navigation.navigate("Staff")}
           />
           <DashboardActionCard
             eyebrow="Reports"
-            title="Staff and exports"
-            body="Open live reports and OWNER staff management."
+            iconName="bar-chart-2"
+            title="Download reports"
+            body="Export QR, scan, claim, and return reports."
             onPress={() => navigation.navigate("Reports")}
           />
         </View>
       ) : (
         <View style={styles.actionBand}>
           <Text style={styles.sectionTitle}>Staff access</Text>
-          <Text style={styles.bodyText}>Contractor data is read-only. Reward fulfillment, staff management, and exports are OWNER-only.</Text>
+          <Text style={styles.bodyText}>Contractor data is read-only. Reward fulfillment, staff management, and report downloads are manager-only.</Text>
           <DashboardActionCard
             eyebrow="Available"
+            iconName="maximize"
             title="Return Scan"
             body="Lookup return labels and perform allowed QR return operations."
             onPress={() => navigation.navigate("ReturnScan")}
           />
           <DashboardActionCard
             eyebrow="Read only"
+            iconName="users"
             title="Contractors"
             body="View contractor status, sites, and points."
             onPress={() => navigation.navigate("Contractors")}
@@ -507,7 +593,7 @@ function DashboardScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent activity</Text>
       </View>
-      {(dashboard?.recentActivity ?? []).slice(0, 5).map((activity, index) => (
+      {recentActivity.slice(0, 5).map((activity, index) => (
         <ActivityRow
           key={activity.auditEventId || `${activity.action}-${activity.createdAt}-${index}`}
           action={activity.action}
@@ -516,7 +602,9 @@ function DashboardScreen() {
           targetType={activity.targetType}
         />
       ))}
-      {dashboard && dashboard.recentActivity.length === 0 ? <EmptyState title="No recent activity" /> : null}
+      {dashboard && recentActivity.length === 0 ? (
+        <StateCard body="New QR prints, return actions, reward claims, contractor updates, and staff actions will appear here." title="No recent activity" tone="muted" />
+      ) : null}
       <StatusText status={status} />
     </ScreenFrame>
   );
@@ -524,6 +612,7 @@ function DashboardScreen() {
 
 function ReturnScanScreen() {
   const { session } = useAdminContext();
+  const devFeatures = useMemo(() => getRuntimeAdminMobileDevFeatures(), []);
   const [token, setToken] = useState("");
   const [result, setResult] = useState<ReturnQrResult | null>(null);
   const [labelRemoved, setLabelRemoved] = useState(false);
@@ -533,8 +622,8 @@ function ReturnScanScreen() {
     message: "",
   });
 
-  async function lookup() {
-    const qrToken = token.trim();
+  async function lookup(scannedToken?: string) {
+    const qrToken = normalizeQrScannerData(scannedToken ?? token);
     if (!session) {
       setStatus({ tone: "danger", message: "Admin session is not available." });
       return;
@@ -546,6 +635,7 @@ function ReturnScanScreen() {
     setBusy(true);
     setStatus({ tone: "idle", message: "Checking QR status" });
     try {
+      setToken(qrToken);
       const response = await lookupReturnQr(session.token, qrToken);
       setResult(response);
       setLabelRemoved(false);
@@ -592,29 +682,37 @@ function ReturnScanScreen() {
 
   return (
     <ScreenFrame>
-      <View style={styles.topBar}>
-        <View style={styles.operatorCopy}>
-          <Text style={styles.eyebrow}>Returned product</Text>
-          <Text numberOfLines={1} style={styles.screenTitle}>Return Scan</Text>
-          <Text numberOfLines={2} style={styles.muted}>Check QR status before cancel or reverse.</Text>
-        </View>
-      </View>
       <View style={styles.scanPanel}>
         <View style={styles.scanLens}>
           <Text style={styles.scanMark}>QR</Text>
         </View>
+        <Text style={styles.scanEyebrow}>Returned product</Text>
         <Text style={styles.scanTitle}>Returned product label</Text>
         <Text style={styles.scanSubtitle}>Scan status, cancel unused QR, or reverse collected points.</Text>
       </View>
-      <FieldLabel label="QR token" />
-      <TextInput
-        autoCapitalize="none"
-        onChangeText={setToken}
-        placeholder="Paste or type QR token"
-        style={styles.input}
-        value={token}
+      <View style={styles.returnStepStrip}>
+        <ReturnStep label="Scan" text="Read returned product QR" />
+        <ReturnStep label="Review" text="Check status and points impact" />
+        <ReturnStep label="Confirm" text="Remove and discard label" />
+      </View>
+      <ReturnQrCameraScanner
+        disabled={busy}
+        onScanned={(qrToken) => lookup(qrToken)}
       />
-      <PrimaryButton disabled={busy} label={busy ? "Working" : "Lookup status"} onPress={() => void lookup()} />
+      {devFeatures.allowManualQrEntry ? (
+        <View style={styles.manualScanFallback}>
+          <Text style={styles.manualScanTitle}>Manual test fallback</Text>
+          <FieldLabel label="QR token" />
+          <TextInput
+            autoCapitalize="none"
+            onChangeText={setToken}
+            placeholder="Paste or type QR token"
+            style={styles.input}
+            value={token}
+          />
+          <PrimaryButton disabled={busy} label={busy ? "Working" : "Lookup status"} onPress={() => void lookup()} />
+        </View>
+      ) : null}
       {result ? (
         <ReturnQrStatusCard
           busy={busy}
@@ -628,6 +726,69 @@ function ReturnScanScreen() {
       ) : null}
       <StatusText status={status} />
     </ScreenFrame>
+  );
+}
+
+function ReturnQrCameraScanner({
+  disabled,
+  onScanned,
+}: {
+  readonly disabled: boolean;
+  readonly onScanned: (token: string) => Promise<void>;
+}) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [busy, setBusy] = useState(false);
+  const [lastAcceptedData, setLastAcceptedData] = useState("");
+
+  async function handleBarcodeScanned(result: BarcodeScanningResult): Promise<void> {
+    if (disabled || busy || !shouldAcceptQrScannerData(result.data, lastAcceptedData)) {
+      return;
+    }
+    const token = normalizeQrScannerData(result.data);
+    setLastAcceptedData(token);
+    setBusy(true);
+    try {
+      await onScanned(token);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!permission) {
+    return (
+      <View style={styles.cameraNotice}>
+        <Text style={styles.cameraNoticeText}>Opening camera scanner.</Text>
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.cameraPermissionCard}>
+        <Text style={styles.sectionTitle}>Camera permission needed</Text>
+        <Text style={styles.muted}>Allow camera access to scan the returned product QR label.</Text>
+        <PrimaryButton label="Allow camera" onPress={() => void requestPermission()} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.cameraScannerCard}>
+      <View style={styles.cameraPreviewShell}>
+        <CameraView
+          active={!disabled && !busy}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          facing="back"
+          onBarcodeScanned={!disabled && !busy ? (result) => void handleBarcodeScanned(result) : undefined}
+          style={styles.cameraPreview}
+        />
+        <View pointerEvents="none" style={styles.cameraOverlay}>
+          <View style={styles.cameraFrame} />
+        </View>
+      </View>
+      <Text style={styles.cameraScannerTitle}>{busy ? "Checking QR" : "Camera scanner ready"}</Text>
+      <Text style={styles.cameraScannerHint}>Place the returned product QR label inside the frame.</Text>
+    </View>
   );
 }
 
@@ -652,25 +813,33 @@ function ReturnQrStatusCard({
   const canCancel = result.action === "CAN_CANCEL" && !operation;
   const canReverse = result.action === "CAN_REVERSE" && !operation;
   const actionDisabled = busy || !labelRemoved;
+  const stateTone = returnStateTone(operation?.type ?? result.status);
+  const actionLabel = canCancel ? "Cancel QR allowed" : canReverse ? "Reverse points allowed" : humanizeAction(result.status);
 
   return (
     <View style={styles.returnCard}>
       <View style={styles.returnCardHeader}>
+        <StateGlyph compact tone={stateTone} />
         <View style={styles.returnCardCopy}>
-          <Text numberOfLines={1} style={styles.eyebrow}>{result.qr.invoiceNumber}</Text>
-          <Text numberOfLines={2} style={styles.returnProduct}>{result.qr.productName}</Text>
+          <Text numberOfLines={2} style={styles.eyebrow}>{actionLabel}</Text>
+          <Text numberOfLines={3} style={styles.returnProduct}>{result.qr.productName}</Text>
           <Text numberOfLines={1} style={styles.rowMeta}>
-            {result.qr.productSku ?? "QR unit"} · {result.qr.shortCode}
+            {result.qr.invoiceNumber} · {result.qr.productSku ?? result.qr.shortCode}
           </Text>
         </View>
         <ReturnStatusBadge status={operation?.type ?? result.status} />
       </View>
 
+      <View style={styles.lightMetricRow}>
+        <LightMetric label="QR points" value={formatPoints(result.qr.points)} emphasis />
+        <LightMetric label="Action" value={result.action === "NONE" ? "Review" : result.action === "CAN_CANCEL" ? "Cancel" : "Reverse"} />
+      </View>
+
       <View style={styles.returnDetailGrid}>
-        <DetailRow label="QR points" value={`Rs. ${result.qr.points}`} />
         <DetailRow label="Token" value={result.tokenStatus} />
         <DetailRow label="Printed" value={result.qr.printedAt ? formatDate(result.qr.printedAt) : "Not printed"} />
         <DetailRow label="Expires" value={result.qr.expiresAt ? formatDate(result.qr.expiresAt) : "--"} />
+        <DetailRow label="Short code" value={result.qr.shortCode} />
       </View>
 
       {result.contractor ? (
@@ -678,7 +847,7 @@ function ReturnQrStatusCard({
           <Text style={styles.sectionTitle}>Contractor</Text>
           <DetailRow label="Name" value={result.contractor.name} />
           <DetailRow label="Mobile" value={result.contractor.mobileNumber} />
-          <DetailRow label="Available" value={`Rs. ${result.contractor.pointsAvailable}`} />
+          <DetailRow label="Available" value={formatPoints(result.contractor.pointsAvailable)} />
           {result.qr.scannedAt ? <DetailRow label="Scanned" value={formatDateTime(result.qr.scannedAt)} /> : null}
         </View>
       ) : null}
@@ -696,6 +865,10 @@ function ReturnQrStatusCard({
 
       {canCancel || canReverse ? (
         <>
+          <View style={styles.returnWarningCard}>
+            <Text style={styles.warningTitle}>Physical label check required</Text>
+            <Text style={styles.warningCopyNeutral}>Only continue after the QR label has been removed from the returned product and discarded.</Text>
+          </View>
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: labelRemoved }}
@@ -725,16 +898,16 @@ function ReverseImpactPanel({ impact }: { readonly impact: NonNullable<ReturnQrL
   return (
     <View style={[styles.impactPanel, impact.createsNegativeBalance ? styles.impactPanelDanger : null]}>
       <Text style={styles.sectionTitle}>Points reversal</Text>
-      <DetailRow label="Reverse" value={`Rs. ${impact.pointsToReverse}`} />
-      <DetailRow label="Current balance" value={`Rs. ${impact.currentBalance}`} />
-      <DetailRow label="After QR reverse" value={`Rs. ${impact.projectedBalanceAfterQrReverse}`} />
-      <DetailRow label="After claim impact" value={`Rs. ${impact.projectedBalanceAfterClaimRevocations}`} />
+      <DetailRow label="Reverse" value={formatPoints(impact.pointsToReverse)} />
+      <DetailRow label="Current balance" value={formatPoints(impact.currentBalance)} />
+      <DetailRow label="After QR reverse" value={formatPoints(impact.projectedBalanceAfterQrReverse)} />
+      <DetailRow label="After claim impact" value={formatPoints(impact.projectedBalanceAfterClaimRevocations)} />
       {impact.claimsToRevoke.length > 0 ? (
         <View style={styles.claimList}>
           <Text style={styles.warningTitle}>Unfulfilled claims to revoke</Text>
           {impact.claimsToRevoke.map((claim) => (
             <Text key={claim.rewardClaimId} style={styles.claimLine}>
-              {claim.claimId} · {claim.rewardName} · Rs. {claim.pointsDeducted}
+              {claim.claimId} · {claim.rewardName} · {formatPoints(claim.pointsDeducted)}
             </Text>
           ))}
         </View>
@@ -752,7 +925,7 @@ function OperationPanel({ operation }: { readonly operation: ReturnQrMutationRes
       <Text style={styles.operationTitle}>{operation.type === "CANCELLED" ? "QR cancelled" : "QR reversed"}</Text>
       <Text style={styles.bodyText}>Reason: {operation.reason}</Text>
       {typeof operation.balanceAfter === "number" ? (
-        <Text style={styles.bodyText}>Balance after: Rs. {operation.balanceAfter}</Text>
+        <Text style={styles.bodyText}>Balance after: {formatPoints(operation.balanceAfter)}</Text>
       ) : null}
       {operation.revokedClaims.length > 0 ? (
         <View style={styles.claimList}>
@@ -801,7 +974,7 @@ function ContractorsScreen() {
   const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "Loading contractors" });
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const isOwner = session?.role === "OWNER";
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
 
   async function load() {
     if (!session) {
@@ -850,7 +1023,7 @@ function ContractorsScreen() {
   }
 
   async function registerContractor() {
-    if (!session || !isOwner) {
+    if (!session || !isManager) {
       return;
     }
     if (!draft.name.trim() || draft.mobileNumber.length !== 10) {
@@ -878,6 +1051,7 @@ function ContractorsScreen() {
 
   const activeCount = contractors.filter((contractor) => contractor.status === "ACTIVE").length;
   const inactiveCount = contractors.length - activeCount;
+  const totalAvailablePoints = contractors.reduce((total, contractor) => total + contractor.availablePoints, 0);
 
   return (
     <ScreenFrame
@@ -885,11 +1059,19 @@ function ContractorsScreen() {
     >
       <View style={styles.topBar}>
         <View style={styles.operatorCopy}>
-          <Text style={styles.eyebrow}>{session?.role === "OWNER" ? "Manage" : "Read only"}</Text>
+          <Text style={styles.eyebrow}>{isManager ? "Manage" : "Read only"}</Text>
           <Text numberOfLines={1} style={styles.screenTitle}>Contractors</Text>
-          <Text numberOfLines={2} style={styles.muted}>{session?.role === "OWNER" ? "Registration and profile controls" : "View contractor status"}</Text>
+          <Text numberOfLines={2} style={styles.muted}>{isManager ? "Registration and profile controls" : "View contractor status"}</Text>
         </View>
       </View>
+
+      <StateCard
+        body={isManager
+          ? "Register contractors, open profiles, update photos, reset MPINs, and manage active status."
+          : "Profiles, sites, points, and scans are visible without mutation controls."}
+        title={isManager ? "Contractor management" : "Read-only contractor directory"}
+        tone={isManager ? "success" : "muted"}
+      />
 
       <View style={styles.metricGrid}>
         <MetricTile label="Active" value={activeCount} />
@@ -897,10 +1079,20 @@ function ContractorsScreen() {
         <MetricTile label="Sites" value={contractors.reduce((total, contractor) => total + contractor.siteCount, 0)} />
         <MetricTile label="Scans" value={contractors.reduce((total, contractor) => total + contractor.scanCount, 0)} />
       </View>
+      <View style={styles.lightMetricRow}>
+        <LightMetric compact label="Directory points available" value={formatPoints(totalAvailablePoints)} />
+        <LightMetric compact label="Contractor records" value={String(contractors.length)} />
+      </View>
 
-      {isOwner ? (
+      {isManager ? (
         <View style={styles.formBlock}>
-          <Text style={styles.sectionTitle}>Register contractor</Text>
+          <View style={styles.panelHeaderRow}>
+            <View style={styles.rowBody}>
+              <Text style={styles.sectionTitle}>Register contractor</Text>
+              <Text style={styles.rowMeta}>Name and mobile become immutable after registration.</Text>
+            </View>
+            <Text numberOfLines={1} style={[styles.badge, styles.badgeGood]}>{session?.role ?? "ADMIN"}</Text>
+          </View>
           <FieldLabel label="Full name" />
           <TextInput
             autoCapitalize="words"
@@ -947,17 +1139,22 @@ function ContractorsScreen() {
         >
           <Avatar name={contractor.name} {...(contractor.photoUrl ? { photoUrl: contractor.photoUrl } : {})} />
           <View style={styles.rowBody}>
-            <Text numberOfLines={1} style={styles.rowTitle}>{contractor.name}</Text>
+            <View style={styles.entityHeaderRow}>
+              <Text numberOfLines={1} style={[styles.rowTitle, styles.entityTitleText]}>{contractor.name}</Text>
+              <Text numberOfLines={1} style={[styles.badge, contractor.status === "ACTIVE" ? styles.badgeGood : styles.badgeWarn]}>
+                {contractor.status}
+              </Text>
+            </View>
             <Text numberOfLines={1} style={styles.rowMeta}>
               {contractor.contractorCode} · {contractor.mobileNumber}
             </Text>
-            <Text numberOfLines={1} style={styles.rowMeta}>
-              {contractor.availablePoints} points available · {contractor.siteCount} sites
-            </Text>
+            <View style={styles.rowFactStrip}>
+              <MiniFact label="Points" value={formatPoints(contractor.availablePoints)} />
+              <MiniFact label="Sites" value={String(contractor.siteCount)} />
+              <MiniFact label="Scans" value={String(contractor.scanCount)} />
+            </View>
           </View>
-          <Text style={[styles.badge, contractor.status === "ACTIVE" ? styles.badgeGood : styles.badgeWarn]}>
-            {contractor.status}
-          </Text>
+          <Text style={styles.chevronText}>{">"}</Text>
         </Pressable>
       ))}
       {contractors.length === 0 ? <EmptyState title="No contractors loaded" /> : null}
@@ -974,6 +1171,7 @@ function ContractorDetailScreen() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [resetMpinResult, setResetMpinResult] = useState<ContractorResetMpinResponse | null>(null);
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
 
   async function loadContractor(successMessage = "Contractor loaded") {
     if (!session) {
@@ -994,7 +1192,7 @@ function ContractorDetailScreen() {
   }, [route.params.contractorId, session?.token]);
 
   async function pickContractorPhoto() {
-    if (!session || !detail || session.role !== "OWNER") {
+    if (!session || !detail || !isManager) {
       return;
     }
     setPhotoBusy(true);
@@ -1017,7 +1215,7 @@ function ContractorDetailScreen() {
   }
 
   async function resetContractorPin() {
-    if (!session || !detail || session.role !== "OWNER") {
+    if (!session || !detail || !isManager) {
       return;
     }
     setActionBusy(true);
@@ -1034,7 +1232,7 @@ function ContractorDetailScreen() {
   }
 
   async function toggleContractorStatus() {
-    if (!session || !detail || session.role !== "OWNER") {
+    if (!session || !detail || !isManager) {
       return;
     }
     setActionBusy(true);
@@ -1060,14 +1258,32 @@ function ContractorDetailScreen() {
           <View style={styles.profileBand}>
             <Avatar name={detail.name} {...(detail.photoUrl ? { photoUrl: detail.photoUrl } : {})} large />
             <View style={styles.profileText}>
-              <Text numberOfLines={1} style={styles.screenTitle}>{detail.name}</Text>
+              <View style={styles.entityHeaderRow}>
+                <Text numberOfLines={2} style={[styles.screenTitle, styles.entityTitleText]}>{detail.name}</Text>
+                <Text numberOfLines={1} style={[styles.badge, detail.status === "ACTIVE" ? styles.badgeGood : styles.badgeWarn]}>
+                  {detail.status}
+                </Text>
+              </View>
               <Text numberOfLines={1} style={styles.muted}>{detail.mobileNumber}</Text>
               <Text numberOfLines={1} style={styles.muted}>{detail.contractorCode}</Text>
             </View>
           </View>
-          {session?.role === "OWNER" ? (
+          {!isManager ? (
+            <StateCard
+              body="This profile is view-only for STAFF. Editing, MPIN reset, and active-status changes are manager-only."
+              title="Read-only profile"
+              tone="muted"
+            />
+          ) : null}
+          {isManager ? (
             <View style={styles.actionBand}>
-              <Text style={styles.sectionTitle}>Owner actions</Text>
+              <View style={styles.panelHeaderRow}>
+                <View style={styles.rowBody}>
+                  <Text style={styles.sectionTitle}>Management actions</Text>
+                  <Text style={styles.rowMeta}>Photo, MPIN, and active-status controls remain backend validated.</Text>
+                </View>
+                <Text numberOfLines={1} style={[styles.badge, styles.badgeGood]}>{session?.role ?? "ADMIN"}</Text>
+              </View>
               <SecondaryButton
                 disabled={photoBusy || actionBusy}
                 label={photoBusy ? "Uploading photo" : "Upload contractor photo"}
@@ -1108,16 +1324,11 @@ function ContractorDetailScreen() {
               <Text numberOfLines={1} style={styles.rowTitle}>{site.clientName}</Text>
               <Text numberOfLines={2} style={styles.rowMeta}>{formatSite(site)}</Text>
               <Text numberOfLines={1} style={styles.rowMeta}>
-                {site.status} · {site.scanCount} scans
+              {site.status} · {site.scanCount} scans
               </Text>
             </View>
           ))}
-          {session?.role === "STAFF" ? (
-            <View style={styles.deniedBox}>
-              <Text style={styles.deniedTitle}>Read-only access</Text>
-              <Text style={styles.bodyText}>STAFF cannot edit, deactivate, change points, or manage rewards.</Text>
-            </View>
-          ) : null}
+          {detail.sites.length === 0 ? <EmptyState title="No active sites linked" /> : null}
         </>
       ) : (
         <View style={styles.centered}>
@@ -1129,48 +1340,13 @@ function ContractorDetailScreen() {
   );
 }
 
-interface RewardDraft {
-  readonly rewardId?: string;
-  readonly code: string;
-  readonly name: string;
-  readonly quickDescription: string;
-  readonly cashValueInr: string;
-  readonly pointsRequired: string;
-  readonly totalQuantity: string;
-  readonly status: RewardCatalogStatus;
-}
-
-const emptyRewardDraft: RewardDraft = {
-  code: "",
-  name: "",
-  quickDescription: "",
-  cashValueInr: "",
-  pointsRequired: "",
-  totalQuantity: "",
-  status: "DRAFT",
-};
-
-function toRewardDraft(item: RewardCatalogItem): RewardDraft {
-  return {
-    rewardId: item.rewardId,
-    code: item.code,
-    name: item.name,
-    quickDescription: item.quickDescription,
-    cashValueInr: String(item.cashValueInr),
-    pointsRequired: String(item.pointsRequired),
-    totalQuantity: String(item.totalQuantity),
-    status: item.status,
-  };
-}
-
 function RewardsScreen() {
   const { session } = useAdminContext();
-  const isOwner = session?.role === "OWNER";
-  const [items, setItems] = useState<readonly RewardCatalogItem[]>([]);
+  const devFeatures = useMemo(() => getRuntimeAdminMobileDevFeatures(), []);
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
   const [claims, setClaims] = useState<readonly AdminRewardClaimLookup[]>([]);
   const [history, setHistory] = useState<readonly AdminRewardClaimHistoryEntry[]>([]);
   const [selectedClaim, setSelectedClaim] = useState<AdminRewardClaimLookup | null>(null);
-  const [draft, setDraft] = useState<RewardDraft>(emptyRewardDraft);
   const [activeSection, setActiveSection] = useState<AdminRewardSection>("CLAIMS");
   const [claimIdInput, setClaimIdInput] = useState("");
   const [otp, setOtp] = useState("");
@@ -1185,30 +1361,20 @@ function RewardsScreen() {
     }
     setStatus({ tone: "idle", message: "Loading rewards" });
     try {
-      const [nextClaims, nextHistory, nextItems] = await Promise.all([
-        isOwner ? listRewardClaims(session.token) : Promise.resolve([]),
+      const [nextClaims, nextHistory] = await Promise.all([
+        isManager ? listRewardClaims(session.token) : Promise.resolve([]),
         listRewardClaimHistory(session.token),
-        isOwner ? listRewardCatalog(session.token) : Promise.resolve([]),
       ]);
       setClaims(nextClaims);
       setHistory(nextHistory);
-      setItems(nextItems);
       setSelectedClaim((current) => {
-        if (!isOwner) {
+        if (!isManager) {
           return null;
         }
         const currentClaim = current ? nextClaims.find((item) => item.claim.claimId === current.claim.claimId) : undefined;
         return currentClaim ?? nextClaims[0] ?? current;
       });
-      setDraft((current) => {
-        if (!isOwner) {
-          return emptyRewardDraft;
-        }
-        const currentItem = current.rewardId ? nextItems.find((item) => item.rewardId === current.rewardId) : undefined;
-        const itemToSelect = currentItem ?? nextItems[0];
-        return itemToSelect ? toRewardDraft(itemToSelect) : emptyRewardDraft;
-      });
-      setStatus({ tone: "success", message: isOwner ? `${nextClaims.length} claims, ${nextHistory.length} history records` : `${nextHistory.length} history records` });
+      setStatus({ tone: "success", message: isManager ? `${nextClaims.length} claims, ${nextHistory.length} history records` : `${nextHistory.length} history records` });
     } catch (error) {
       setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Rewards failed" });
     }
@@ -1219,10 +1385,10 @@ function RewardsScreen() {
   }, [session?.token]);
 
   useEffect(() => {
-    if (!isOwner && activeSection !== "HISTORY") {
+    if (!isManager && activeSection !== "HISTORY") {
       setActiveSection("HISTORY");
     }
-  }, [activeSection, isOwner]);
+  }, [activeSection, isManager]);
 
   async function refresh() {
     setRefreshing(true);
@@ -1262,9 +1428,10 @@ function RewardsScreen() {
       const refreshedClaim = await lookupRewardClaim(session.token, claimId);
       setSelectedClaim(refreshedClaim);
       setOtpResult(result);
-      setOtp(result.delivery.mockOtp ?? "");
+      const visibleMockOtp = devFeatures.showMockOtp ? result.delivery.mockOtp : undefined;
+      setOtp(visibleMockOtp ?? "");
       await load();
-      setStatus({ tone: "success", message: result.delivery.mockOtp ? `OTP sent. Local dev OTP: ${result.delivery.mockOtp}` : "OTP sent" });
+      setStatus({ tone: "success", message: visibleMockOtp ? `OTP sent. Local dev OTP: ${visibleMockOtp}` : "OTP sent" });
     } catch (error) {
       setOtpResult(null);
       setOtp("");
@@ -1301,95 +1468,15 @@ function RewardsScreen() {
     }
   }
 
-  function editReward(item: RewardCatalogItem) {
-    setDraft(toRewardDraft(item));
-    setStatus({ tone: "idle", message: `${item.code} loaded` });
-  }
-
-  async function saveReward() {
-    if (!session) {
-      return;
-    }
-    setBusy(true);
-    setStatus({ tone: "idle", message: "Saving reward" });
-    try {
-      const payload = {
-        code: draft.code,
-        name: draft.name,
-        quickDescription: draft.quickDescription,
-        cashValueInr: Number(draft.cashValueInr),
-        pointsRequired: Number(draft.pointsRequired),
-        totalQuantity: Number(draft.totalQuantity),
-        status: draft.status,
-      };
-      const saved = draft.rewardId
-        ? await updateRewardCatalogItem(session.token, draft.rewardId, payload)
-        : await createRewardCatalogItem(session.token, payload);
-      setItems((current) => upsertRewardCatalog(current, saved));
-      editReward(saved);
-      setStatus({ tone: "success", message: "Reward saved" });
-    } catch (error) {
-      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Reward save failed" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function pickRewardImage() {
-    if (!session || !draft.rewardId) {
-      setStatus({ tone: "danger", message: "Save the reward before uploading an image." });
-      return;
-    }
-    setBusy(true);
-    setStatus({ tone: "idle", message: "Uploading image" });
-    try {
-      const image = await pickDeviceImage({ quality: 0.82 });
-      if (!image) {
-        setStatus({ tone: "idle", message: "Image selection cancelled" });
-        return;
-      }
-      const updated = await addRewardCatalogImage(session.token, draft.rewardId, {
-        fileName: image.fileName ?? `${draft.code || "reward"}.jpg`,
-        contentType: image.contentType,
-        dataUrl: image.dataUrl,
-        altText: draft.name,
-      });
-      setItems((current) => upsertRewardCatalog(current, updated));
-      editReward(updated);
-      setStatus({ tone: "success", message: "Reward image uploaded" });
-    } catch (error) {
-      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Image upload failed" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleReward(item: RewardCatalogItem) {
-    if (!session) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const updated = item.status === "ACTIVE"
-        ? await deactivateRewardCatalogItem(session.token, item.rewardId)
-        : await reactivateRewardCatalogItem(session.token, item.rewardId);
-      setItems((current) => upsertRewardCatalog(current, updated));
-      editReward(updated);
-      setStatus({ tone: "success", message: updated.status === "ACTIVE" ? "Reward activated" : "Reward deactivated" });
-    } catch (error) {
-      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Status update failed" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const selected = draft.rewardId ? items.find((item) => item.rewardId === draft.rewardId) : undefined;
   const canMarkDelivered = Boolean(
     !busy &&
     otpResult &&
     otp.length === 6 &&
     selectedClaim?.claim.status === "CHOSEN",
   );
+  const visibleRewardSection: AdminRewardSection = isManager ? activeSection : "HISTORY";
+  const deliveredHistoryCount = history.filter((item) => item.claim.status === "FULFILLED").length;
+  const openHistoryCount = history.filter((item) => item.claim.status === "CHOSEN").length;
 
   return (
     <ScreenFrame
@@ -1397,19 +1484,37 @@ function RewardsScreen() {
     >
       <View style={styles.topBar}>
         <View style={styles.operatorCopy}>
-          <Text style={styles.eyebrow}>{isOwner ? "OWNER rewards" : "STAFF history"}</Text>
+          <Text style={styles.eyebrow}>{isManager ? "Claim Desk" : "Reward History"}</Text>
           <Text numberOfLines={1} style={styles.screenTitle}>Rewards</Text>
-          <Text numberOfLines={2} style={styles.muted}>{isOwner ? "Fulfill reward claims, review history, and manage catalog." : "Review contractor reward developments."}</Text>
+          <Text numberOfLines={2} style={styles.muted}>{isManager ? "Fulfill reward claims and review history." : "Review contractor reward developments."}</Text>
         </View>
       </View>
 
-      <RewardSectionTabs activeSection={activeSection} isOwner={isOwner} onChange={setActiveSection} />
+      <StateCard
+        body={isManager
+          ? "Use Claim Desk for OTP and Delivered controls. Reward setup stays in Admin Web."
+          : "Reward History is available for review. OTP and Delivered controls are manager-only."}
+        title={isManager ? "Reward fulfillment" : "Reward History read-only"}
+        tone={isManager ? "success" : "muted"}
+      />
 
-      {isOwner && activeSection === "CLAIMS" ? (
+      <View style={styles.lightMetricRow}>
+        <LightMetric compact emphasis={isManager} label={isManager ? "Active Claim Raised" : "History records"} value={String(isManager ? claims.length : history.length)} />
+        <LightMetric compact label="Delivered records" value={String(deliveredHistoryCount)} />
+      </View>
+
+      <RewardSectionTabs activeSection={visibleRewardSection} isManager={isManager} onChange={setActiveSection} />
+
+      {isManager && visibleRewardSection === "CLAIMS" ? (
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Claim Desk</Text>
           </View>
+          <StateCard
+            body="Select a valid Claim Raised request, send contractor OTP, then mark Delivered only after OTP verification."
+            title="Fulfillment checkpoint"
+            tone="warning"
+          />
           {claims.length === 0 ? <EmptyState title="No active Claim Raised requests." /> : null}
           {claims.map((item) => (
             <Pressable
@@ -1417,16 +1522,27 @@ function RewardsScreen() {
               accessibilityRole="button"
               key={item.claim.rewardClaimId}
               onPress={() => {
-              setSelectedClaim(item);
-              setOtp("");
-              setOtpResult(null);
-            }} style={styles.rewardClaimRow}>
+                setSelectedClaim(item);
+                setOtp("");
+                setOtpResult(null);
+              }}
+              style={[
+                styles.rewardClaimRow,
+                selectedClaim?.claim.rewardClaimId === item.claim.rewardClaimId ? styles.rewardClaimRowSelected : null,
+              ]}
+            >
               <View style={styles.rowBody}>
-                <Text numberOfLines={1} style={styles.rowTitle}>{item.contractor.name}</Text>
+                <View style={styles.entityHeaderRow}>
+                  <Text numberOfLines={1} style={[styles.rowTitle, styles.entityTitleText]}>{item.contractor.name}</Text>
+                  <Text numberOfLines={1} style={[styles.badge, styles.badgeGood]}>Claim Raised</Text>
+                </View>
                 <Text numberOfLines={1} style={styles.rowMeta}>{item.contractor.mobileNumber} · {item.claim.claimId}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>{item.claim.rewardName} · Rs. {item.claim.pointsDeducted}</Text>
+                <View style={styles.rowFactStrip}>
+                  <MiniFact label="Reward" value={item.claim.rewardName} />
+                  <MiniFact label="Points" value={formatPoints(item.claim.pointsDeducted)} />
+                </View>
               </View>
-              <Text style={[styles.badge, styles.badgeGood]}>Claim Raised</Text>
+              <Text style={styles.chevronText}>{">"}</Text>
             </Pressable>
           ))}
 
@@ -1444,14 +1560,27 @@ function RewardsScreen() {
 
           {selectedClaim ? (
             <View style={styles.rewardMobileSummary}>
-              <Text numberOfLines={1} style={styles.rowTitle}>{selectedClaim.claim.claimId}</Text>
+              <View style={styles.panelHeaderRow}>
+                <View style={styles.rowBody}>
+                  <Text style={styles.eyebrow}>Selected claim</Text>
+                  <Text numberOfLines={1} style={styles.sectionTitle}>{selectedClaim.claim.claimId}</Text>
+                </View>
+                <Text numberOfLines={1} style={[styles.badge, selectedClaim.claim.status === "FULFILLED" ? styles.badgeGood : styles.badgeWarn]}>
+                  {compactClaimStatusLabel(selectedClaim.claim.status)}
+                </Text>
+              </View>
               <DetailRow label="Status" value={claimStatusLabel(selectedClaim.claim.status)} />
               <DetailRow label="Contractor" value={selectedClaim.contractor.name} />
               <DetailRow label="Phone" value={selectedClaim.contractor.mobileNumber} />
               <DetailRow label="Reward" value={selectedClaim.claim.rewardName} />
-              <DetailRow label="Rs spent" value={`Rs. ${selectedClaim.claim.pointsDeducted}`} />
+              <DetailRow label="Points spent" value={formatPoints(selectedClaim.claim.pointsDeducted)} />
               <DetailRow label="Raised" value={formatDateTime(selectedClaim.claim.chosenAt)} />
               {selectedClaim.claim.fulfilledAt ? <DetailRow label="Delivered" value={formatDateTime(selectedClaim.claim.fulfilledAt)} /> : null}
+              <StateCard
+                body={selectedClaim.canSendOtp ? "Send OTP to the contractor before physical delivery." : "This claim is not eligible for OTP from the current backend state."}
+                title="OTP handoff"
+                tone={selectedClaim.canSendOtp ? "warning" : "muted"}
+              />
               <PrimaryButton disabled={busy || !selectedClaim.canSendOtp} label={busy ? "Sending" : "Send OTP"} onPress={() => void sendOtp()} />
               <FieldLabel label="OTP" />
               <TextInput keyboardType="number-pad" onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} placeholder="6 digit OTP" style={styles.input} value={otp} />
@@ -1462,137 +1591,52 @@ function RewardsScreen() {
         </>
       ) : null}
 
-      {activeSection === "HISTORY" ? (
+      {visibleRewardSection === "HISTORY" ? (
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Reward History</Text>
+          </View>
+          <View style={styles.lightMetricRow}>
+            <LightMetric compact label="Open history" value={String(openHistoryCount)} />
+            <LightMetric compact label="Delivered history" value={String(deliveredHistoryCount)} />
           </View>
           {history.length === 0 ? <EmptyState title="No reward history yet." /> : null}
           {history.map((item) => (
             <View key={item.claim.rewardClaimId} style={styles.rewardHistoryRow}>
               <View style={styles.rowBody}>
-                <Text numberOfLines={1} style={styles.rowTitle}>{item.contractor.name}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>{item.contractor.mobileNumber} · {item.claim.claimId}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>{item.claim.rewardName} · Rs. {item.claim.pointsDeducted}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>Raised {formatDateTime(item.claim.chosenAt)}</Text>
-              </View>
-              <Text style={[styles.badge, item.claim.status === "FULFILLED" ? styles.badgeGood : styles.badgeWarn]}>
-                {claimStatusLabel(item.claim.status)}
-              </Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-
-      {isOwner && activeSection === "CATALOG" ? (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Catalog Management</Text>
-          </View>
-          <View style={styles.formBlock}>
-            <FieldLabel label="Reward code" />
-            <TextInput autoCapitalize="characters" onChangeText={(value) => setDraft((current) => ({ ...current, code: value.toUpperCase() }))} placeholder="RW-TOOLBOX-01" style={styles.input} value={draft.code} />
-            <FieldLabel label="Reward name" />
-            <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, name: value }))} placeholder="Premium Toolbox" style={styles.input} value={draft.name} />
-            <FieldLabel label="Quick description" />
-            <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, quickDescription: value }))} placeholder="Short reward description" style={styles.input} value={draft.quickDescription} />
-            <View style={styles.mobileFormGrid}>
-              <View style={styles.mobileFormCell}>
-                <FieldLabel label="Internal INR" />
-                <TextInput keyboardType="number-pad" onChangeText={(value) => setDraft((current) => ({ ...current, cashValueInr: value.replace(/\D/g, "") }))} style={styles.input} value={draft.cashValueInr} />
-              </View>
-              <View style={styles.mobileFormCell}>
-                <FieldLabel label="Points/Rs" />
-                <TextInput keyboardType="number-pad" onChangeText={(value) => setDraft((current) => ({ ...current, pointsRequired: value.replace(/\D/g, "") }))} style={styles.input} value={draft.pointsRequired} />
-              </View>
-              <View style={styles.mobileFormCell}>
-                <FieldLabel label="Quantity" />
-                <TextInput keyboardType="number-pad" onChangeText={(value) => setDraft((current) => ({ ...current, totalQuantity: value.replace(/\D/g, "") }))} style={styles.input} value={draft.totalQuantity} />
-              </View>
-            </View>
-            <View style={styles.segment}>
-              {(["DRAFT", "ACTIVE", "INACTIVE"] as const).map((nextStatus) => (
-                <SegmentButton
-                  active={draft.status === nextStatus}
-                  key={nextStatus}
-                  label={nextStatus}
-                  onPress={() => setDraft((current) => ({ ...current, status: nextStatus }))}
-                />
-              ))}
-            </View>
-            <PrimaryButton disabled={busy} label={busy ? "Saving" : "Save reward"} onPress={() => void saveReward()} />
-            <SecondaryButton label="New reward" onPress={() => setDraft(emptyRewardDraft)} />
-            <SecondaryButton
-              disabled={busy || !draft.rewardId}
-              label={draft.rewardId ? "Upload image" : "Save reward before image"}
-              onPress={() => void pickRewardImage()}
-            />
-            {selected ? (
-              <DestructiveButton
-                disabled={busy}
-                label={selected.status === "ACTIVE" ? "Deactivate reward" : "Activate reward"}
-                onPress={() => void toggleReward(selected)}
-                tone={selected.status === "ACTIVE" ? "warning" : "danger"}
-              />
-            ) : null}
-          </View>
-
-          {selected ? (
-            <View style={styles.rewardMobileSummary}>
-              {selected.imageUrl ? <Image source={{ uri: selected.imageUrl }} style={styles.rewardMobileImage} /> : null}
-              <DetailRow label="Available" value={`${selected.availableQuantity} of ${selected.totalQuantity}`} />
-              <DetailRow label="Reserved" value={String(selected.reservedQuantity)} />
-              <DetailRow label="Delivered" value={String(selected.deliveredQuantity)} />
-              <DetailRow label="Images" value={String(selected.images.length)} />
-              {selected.readinessIssues.map((issue) => (
-                <Text key={issue} style={styles.warningCopy}>{issue}</Text>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Catalog</Text>
-          </View>
-          {items.map((item) => (
-            <Pressable
-              accessibilityLabel={`Edit reward ${item.name}`}
-              accessibilityRole="button"
-              key={item.rewardId}
-              onPress={() => editReward(item)}
-              style={styles.rewardMobileRow}
-            >
-              {item.imageUrl ? (
-                <Image source={{ uri: item.imageUrl }} style={styles.rewardRowImage} />
-              ) : (
-                <View style={styles.rewardRowImagePlaceholder}>
-                  <Text style={styles.rewardRowImageText}>IMG</Text>
+                <View style={styles.entityHeaderRow}>
+                  <Text numberOfLines={1} style={[styles.rowTitle, styles.entityTitleText]}>{item.contractor.name}</Text>
+                  <Text numberOfLines={1} style={[styles.badge, item.claim.status === "FULFILLED" ? styles.badgeGood : styles.badgeWarn]}>
+                    {compactClaimStatusLabel(item.claim.status)}
+                  </Text>
                 </View>
-              )}
-              <View style={styles.rowBody}>
-                <Text numberOfLines={1} style={styles.rowTitle}>{item.name}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>{item.code} · Rs. {item.pointsRequired}</Text>
-                <Text numberOfLines={1} style={styles.rowMeta}>Stock {item.availableQuantity}/{item.totalQuantity} · {item.images.length} images</Text>
+                <Text numberOfLines={1} style={styles.rowMeta}>{item.contractor.mobileNumber} · {item.claim.claimId}</Text>
+                <View style={styles.rowFactStrip}>
+                  <MiniFact label="Reward" value={item.claim.rewardName} />
+                  <MiniFact label="Points" value={formatPoints(item.claim.pointsDeducted)} />
+                </View>
+                <Text numberOfLines={1} style={styles.rowMeta}>
+                  Raised {formatDateTime(item.claim.chosenAt)}
+                  {item.claim.fulfilledAt ? ` · Delivered ${formatDateTime(item.claim.fulfilledAt)}` : ""}
+                </Text>
               </View>
-              <Text style={[styles.badge, item.status === "ACTIVE" ? styles.badgeGood : styles.badgeWarn]}>{item.status}</Text>
-            </Pressable>
+            </View>
           ))}
         </>
       ) : null}
+
       <StatusText status={status} />
     </ScreenFrame>
   );
 }
 
-function ReportsScreen() {
+function StaffScreen() {
   const { session } = useAdminContext();
-  const isOwner = session?.role === "OWNER";
-  const [activeSection, setActiveSection] = useState<AdminOperationsSection>("REPORTS");
-  const [landing, setLanding] = useState<AdminReportsLanding | null>(null);
-  const [selectedReport, setSelectedReport] = useState<AdminReportResponse | null>(null);
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
   const [staff, setStaff] = useState<readonly StaffSummary[]>([]);
   const [staffDraft, setStaffDraft] = useState<PersonDraft>(emptyPersonDraft);
   const [staffMutation, setStaffMutation] = useState<StaffMutationResponse | null>(null);
-  const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "Loading operations" });
+  const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "Loading staff" });
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -1600,23 +1644,23 @@ function ReportsScreen() {
     if (!session) {
       return;
     }
-    setStatus({ tone: "idle", message: "Loading operations" });
+    if (!isManager) {
+      setStatus({ tone: "warning", message: "Staff management is manager-only." });
+      return;
+    }
+    setStatus({ tone: "idle", message: "Loading staff" });
     try {
-      const [nextLanding, nextStaff] = await Promise.all([
-        getReportsLanding(session.token),
-        isOwner ? listStaff(session.token) : Promise.resolve([]),
-      ]);
-      setLanding(nextLanding);
-      setStaff(nextStaff);
-      setStatus({ tone: "success", message: isOwner ? "Reports and staff loaded" : "Reports loaded" });
+      const result = await listStaff(session.token);
+      setStaff(result);
+      setStatus({ tone: "success", message: `${result.length} staff users loaded` });
     } catch (error) {
-      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Operations failed" });
+      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Staff failed" });
     }
   }
 
   useEffect(() => {
     void load();
-  }, [session?.token]);
+  }, [isManager, session?.token]);
 
   async function refresh() {
     setRefreshing(true);
@@ -1624,24 +1668,10 @@ function ReportsScreen() {
     setRefreshing(false);
   }
 
-  async function openReport(reportId: AdminReportId) {
-    if (!session) {
+  async function pickStaffDraftPhoto() {
+    if (!isManager) {
       return;
     }
-    setBusy(true);
-    setStatus({ tone: "idle", message: "Loading report preview" });
-    try {
-      const report = await getReport(session.token, reportId);
-      setSelectedReport(report);
-      setStatus({ tone: "success", message: `${report.title} loaded` });
-    } catch (error) {
-      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Report failed" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function pickStaffDraftPhoto() {
     setBusy(true);
     setStatus({ tone: "idle", message: "Choosing staff photo" });
     try {
@@ -1664,7 +1694,7 @@ function ReportsScreen() {
   }
 
   async function createStaffMember() {
-    if (!session || !isOwner) {
+    if (!session || !isManager) {
       return;
     }
     if (!staffDraft.name.trim() || staffDraft.mobileNumber.length !== 10) {
@@ -1692,7 +1722,7 @@ function ReportsScreen() {
   }
 
   async function pickStaffPhoto(staffMember: StaffSummary) {
-    if (!session || !isOwner) {
+    if (!session || !isManager) {
       return;
     }
     setBusy(true);
@@ -1715,7 +1745,7 @@ function ReportsScreen() {
   }
 
   async function resetStaffMemberPin(staffMember: StaffSummary) {
-    if (!session || !isOwner) {
+    if (!session || !isManager) {
       return;
     }
     setBusy(true);
@@ -1733,7 +1763,7 @@ function ReportsScreen() {
   }
 
   async function toggleStaffStatus(staffMember: StaffSummary) {
-    if (!session || !isOwner) {
+    if (!session || !isManager) {
       return;
     }
     setBusy(true);
@@ -1752,97 +1782,51 @@ function ReportsScreen() {
     }
   }
 
+  const activeCount = staff.filter((staffMember) => staffMember.status === "ACTIVE").length;
+  const inactiveCount = staff.length - activeCount;
+
   return (
     <ScreenFrame
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.color.primary} />}
     >
       <View style={styles.topBar}>
         <View style={styles.operatorCopy}>
-          <Text style={styles.eyebrow}>{isOwner ? "OWNER operations" : "STAFF reports"}</Text>
-          <Text numberOfLines={1} style={styles.screenTitle}>Reports</Text>
+          <Text style={styles.eyebrow}>{isManager ? `${session?.role ?? "ADMIN"} manager` : "Read only"}</Text>
+          <Text numberOfLines={1} style={styles.screenTitle}>Staff</Text>
           <Text numberOfLines={2} style={styles.muted}>
-            {isOwner ? "Live operational reports and staff controls for the retailer." : "View operational reports without export or staff controls."}
+            {isManager ? "Create staff, upload photos, reset PINs, and manage active status." : "Staff management is not available for this role."}
           </Text>
         </View>
       </View>
 
-      <OperationsSectionTabs activeSection={activeSection} isOwner={isOwner} onChange={setActiveSection} />
+      <StateCard
+        body={isManager
+          ? "OWNER and ADMIN can manage Staff users from mobile. Admin-account management remains outside this screen."
+          : "STAFF can use operational tabs but cannot create or change Staff users."}
+        title={isManager ? "Manager controls" : "Manager-only screen"}
+        tone={isManager ? "success" : "muted"}
+      />
 
-      {activeSection === "REPORTS" ? (
+      {!isManager ? (
         <>
-          {landing ? (
-            <>
-              <View style={styles.metricGrid}>
-                {landing.cards.slice(0, 4).map((card) => (
-                  <ReportStatCard
-                    key={card.key}
-                    label={card.label}
-                    {...(card.meta ? { meta: card.meta } : {})}
-                    value={card.value}
-                  />
-                ))}
-              </View>
-              <Text numberOfLines={2} style={styles.rowMeta}>
-                Range {landing.resolvedRange.label} · generated {formatDateTime(landing.generatedAt)}
-              </Text>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Report shortcuts</Text>
-              </View>
-              {landing.reportShortcuts.map((shortcut) => (
-                <Pressable
-                  accessibilityLabel={`Open ${shortcut.title}`}
-                  accessibilityRole="button"
-                  key={shortcut.reportId}
-                  onPress={() => void openReport(shortcut.reportId)}
-                  style={styles.reportRow}
-                >
-                  <View style={styles.rowBody}>
-                    <Text numberOfLines={1} style={styles.rowTitle}>{shortcut.title}</Text>
-                    <Text numberOfLines={2} style={styles.rowMeta}>{shortcut.description}</Text>
-                    {shortcut.metric ? <Text numberOfLines={1} style={styles.metricDetail}>{shortcut.metric}</Text> : null}
-                  </View>
-                  <Text style={styles.chevronText}>{">"}</Text>
-                </Pressable>
-              ))}
-            </>
-          ) : (
-            <EmptyState title="Reports are loading" />
-          )}
-
-          {selectedReport ? (
-            <View style={styles.reportPreviewPanel}>
-              <View>
-                <Text style={styles.eyebrow}>Preview</Text>
-                <Text numberOfLines={2} style={styles.sectionTitle}>{selectedReport.title}</Text>
-                <Text style={styles.rowMeta}>{selectedReport.totalRows} rows · page {selectedReport.page}</Text>
-              </View>
-              <View style={styles.reportSummaryGrid}>
-                {selectedReport.summary.slice(0, 4).map((item) => (
-                  <View key={`${item.label}-${item.value}`} style={styles.reportSummaryCell}>
-                    <Text numberOfLines={1} style={styles.metricDetail}>{item.label}</Text>
-                    <Text numberOfLines={1} style={styles.rowTitle}>{item.value}</Text>
-                    {item.meta ? <Text numberOfLines={1} style={styles.rowMeta}>{item.meta}</Text> : null}
-                  </View>
-                ))}
-              </View>
-              {selectedReport.rows.length === 0 ? <EmptyState title="No rows for this report" /> : null}
-              {selectedReport.rows.slice(0, 6).map((row, index) => (
-                <ReportPreviewRow
-                  columns={selectedReport.columns}
-                  index={index}
-                  key={`${selectedReport.reportId}-${index}`}
-                  row={row}
-                />
-              ))}
-            </View>
-          ) : null}
+          <EmptyState title="No staff actions available" />
+          <StatusText status={status} />
         </>
-      ) : null}
-
-      {activeSection === "STAFF" && isOwner ? (
+      ) : (
         <>
+          <View style={styles.metricGrid}>
+            <MetricTile label="Active" value={activeCount} />
+            <MetricTile label="Inactive" value={inactiveCount} />
+          </View>
+
           <View style={styles.formBlock}>
-            <Text style={styles.sectionTitle}>Add staff</Text>
+            <View style={styles.panelHeaderRow}>
+              <View style={styles.rowBody}>
+                <Text style={styles.sectionTitle}>Add staff</Text>
+                <Text style={styles.rowMeta}>Name and mobile become the login identity for this Staff user.</Text>
+              </View>
+              <Text numberOfLines={1} style={[styles.badge, styles.badgeGood]}>{session?.role ?? "ADMIN"}</Text>
+            </View>
             <FieldLabel label="Full name" />
             <TextInput
               autoCapitalize="words"
@@ -1904,8 +1888,134 @@ function ReportsScreen() {
             </View>
           ))}
           {staff.length === 0 ? <EmptyState title="No staff users loaded" /> : null}
+          <StatusText status={status} />
         </>
-      ) : null}
+      )}
+    </ScreenFrame>
+  );
+}
+
+function ReportsScreen() {
+  const { session } = useAdminContext();
+  const isManager = canUseManagerAction(session?.role ?? "STAFF");
+  const [landing, setLanding] = useState<AdminReportsLanding | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState<string | null>(null);
+  const [status, setStatus] = useState<StatusMessage>({ tone: "idle", message: "Loading reports" });
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function load() {
+    if (!session) {
+      return;
+    }
+    setStatus({ tone: "idle", message: "Loading reports" });
+    try {
+      const result = await getReportsLanding(session.token);
+      setLanding(result);
+      setStatus({ tone: "success", message: "Reports loaded" });
+    } catch (error) {
+      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Reports failed" });
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [session?.token]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  async function downloadReportFile(reportId: AdminReportId, format: AdminReportExportFormat) {
+    if (!session || !isManager) {
+      setStatus({ tone: "warning", message: "Report downloads are manager-only." });
+      return;
+    }
+    const downloadKey = `${reportId}-${format}`;
+    setDownloadingReport(downloadKey);
+    setStatus({ tone: "idle", message: `Preparing ${format}` });
+    try {
+      const file = await downloadReport(session.token, reportId, format);
+      setStatus({ tone: "success", message: `${file.fileName} downloaded (${formatBytes(file.byteLength)})` });
+    } catch (error) {
+      setStatus({ tone: "danger", message: error instanceof Error ? error.message : "Download failed" });
+    } finally {
+      setDownloadingReport(null);
+    }
+  }
+
+  return (
+    <ScreenFrame
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.color.primary} />}
+    >
+      <View style={styles.topBar}>
+        <View style={styles.operatorCopy}>
+          <Text style={styles.eyebrow}>{isManager ? `${session?.role ?? "ADMIN"} reports` : "Read only"}</Text>
+          <Text numberOfLines={1} style={styles.screenTitle}>Reports</Text>
+          <Text numberOfLines={2} style={styles.muted}>
+            {isManager ? "Download operational reports from mobile." : "Review available reports; downloads are manager-only."}
+          </Text>
+        </View>
+      </View>
+
+      <StateCard
+        body={isManager
+          ? "Choose CSV for spreadsheet review or PDF for sharing outside the app. Email sharing has been removed from Admin Mobile."
+          : "STAFF can see report availability, while CSV and PDF downloads stay with OWNER and ADMIN."}
+        title={isManager ? "Download center" : "Report list"}
+        tone={isManager ? "success" : "muted"}
+      />
+
+      {landing ? (
+        <>
+          <View style={styles.metricGrid}>
+            {landing.cards.slice(0, 4).map((card) => (
+              <ReportStatCard
+                key={card.key}
+                label={card.label}
+                {...(card.meta ? { meta: card.meta } : {})}
+                value={card.value}
+              />
+            ))}
+          </View>
+          <Text numberOfLines={2} style={styles.rowMeta}>
+            Range {landing.resolvedRange.label} · generated {formatDateTime(landing.generatedAt)}
+          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Report downloads</Text>
+          </View>
+          {landing.reportShortcuts.map((shortcut) => {
+            const csvKey = `${shortcut.reportId}-CSV`;
+            const pdfKey = `${shortcut.reportId}-PDF`;
+            return (
+              <View key={shortcut.reportId} style={styles.reportRow}>
+                <View style={styles.rowBody}>
+                  <View style={styles.entityHeaderRow}>
+                    <Text numberOfLines={1} style={[styles.rowTitle, styles.entityTitleText]}>{shortcut.title}</Text>
+                    {shortcut.metric ? <Text numberOfLines={1} style={styles.shortcutBadge}>{shortcut.metric}</Text> : null}
+                  </View>
+                  <Text numberOfLines={2} style={styles.rowMeta}>{shortcut.description}</Text>
+                  <View style={styles.downloadActionRow}>
+                    <ReportDownloadButton
+                      disabled={!isManager || downloadingReport !== null}
+                      label={downloadingReport === csvKey ? "CSV..." : "CSV"}
+                      onPress={() => void downloadReportFile(shortcut.reportId, "CSV")}
+                    />
+                    <ReportDownloadButton
+                      disabled={!isManager || downloadingReport !== null}
+                      label={downloadingReport === pdfKey ? "PDF..." : "PDF"}
+                      onPress={() => void downloadReportFile(shortcut.reportId, "PDF")}
+                    />
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </>
+      ) : (
+        <EmptyState title="Reports are loading" />
+      )}
       <StatusText status={status} />
     </ScreenFrame>
   );
@@ -1940,12 +2050,7 @@ function TabGlyph({
   readonly focused: boolean;
   readonly routeName: keyof TabParamList;
 }) {
-  const label = routeName === "ReturnScan" ? "QR" : routeName.slice(0, 1).toUpperCase();
-  return (
-    <View style={[styles.tabGlyph, focused ? styles.tabGlyphActive : null, { borderColor: color }]}>
-      <Text style={[styles.tabGlyphText, { color }]}>{label}</Text>
-    </View>
-  );
+  return <Feather color={color} name={adminTabIconName(routeName)} size={focused ? 23 : 21} />;
 }
 
 function PinVisibilityButton({ onPress, visible }: { readonly onPress: () => void; readonly visible: boolean }) {
@@ -1957,10 +2062,7 @@ function PinVisibilityButton({ onPress, visible }: { readonly onPress: () => voi
       onPress={onPress}
       style={styles.visibilityIconButton}
     >
-      <View style={styles.eyeShape}>
-        <View style={styles.eyePupil} />
-        {visible ? <View style={styles.eyeSlash} /> : null}
-      </View>
+      <Feather color={theme.color.primary} name={visible ? "eye-off" : "eye"} size={19} />
     </Pressable>
   );
 }
@@ -1975,14 +2077,14 @@ function SegmentButton({ active, label, onPress }: { readonly active: boolean; r
 
 function RewardSectionTabs({
   activeSection,
-  isOwner,
+  isManager,
   onChange,
 }: {
   readonly activeSection: AdminRewardSection;
-  readonly isOwner: boolean;
+  readonly isManager: boolean;
   readonly onChange: (section: AdminRewardSection) => void;
 }) {
-  const sections: readonly AdminRewardSection[] = isOwner ? ["CLAIMS", "HISTORY", "CATALOG"] : ["HISTORY"];
+  const sections: readonly AdminRewardSection[] = isManager ? ["CLAIMS", "HISTORY"] : ["HISTORY"];
 
   return (
     <View style={styles.segment}>
@@ -1998,27 +2100,79 @@ function RewardSectionTabs({
   );
 }
 
-function OperationsSectionTabs({
-  activeSection,
-  isOwner,
-  onChange,
+function ReturnStep({ label, text }: { readonly label: string; readonly text: string }) {
+  return (
+    <View style={styles.returnStep}>
+      <Text style={styles.returnStepLabel}>{label}</Text>
+      <Text numberOfLines={3} style={styles.returnStepText}>{text}</Text>
+    </View>
+  );
+}
+
+function LightMetric({
+  compact,
+  emphasis,
+  label,
+  value,
 }: {
-  readonly activeSection: AdminOperationsSection;
-  readonly isOwner: boolean;
-  readonly onChange: (section: AdminOperationsSection) => void;
+  readonly compact?: boolean;
+  readonly emphasis?: boolean;
+  readonly label: string;
+  readonly value: string;
 }) {
-  const sections: readonly AdminOperationsSection[] = isOwner ? ["REPORTS", "STAFF"] : ["REPORTS"];
+  const wrapsTextValue = /[A-Za-z]/.test(value) && value.length > 7;
 
   return (
-    <View style={styles.segment}>
-      {sections.map((section) => (
-        <SegmentButton
-          active={activeSection === section}
-          key={section}
-          label={section === "REPORTS" ? "Reports" : "Staff"}
-          onPress={() => onChange(section)}
-        />
-      ))}
+    <View style={[styles.lightMetric, compact ? styles.lightMetricCompact : null, emphasis ? styles.lightMetricEmphasis : null]}>
+      <Text
+        adjustsFontSizeToFit={!wrapsTextValue}
+        minimumFontScale={0.76}
+        numberOfLines={wrapsTextValue ? 2 : 1}
+        style={[
+          styles.lightMetricValue,
+          wrapsTextValue ? styles.lightMetricValueWrap : null,
+          emphasis ? styles.lightMetricValueEmphasis : null,
+        ]}
+      >
+        {value}
+      </Text>
+      <Text numberOfLines={2} style={styles.lightMetricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function StateCard({
+  body,
+  title,
+  tone,
+}: {
+  readonly body?: string;
+  readonly title: string;
+  readonly tone: "muted" | "success" | "warning" | "danger";
+}) {
+  return (
+    <View style={[styles.stateCard, styles[`stateCard_${tone}`]]}>
+      <StateGlyph tone={tone} compact />
+      <View style={styles.rowBody}>
+        <Text style={styles.stateTitle}>{title}</Text>
+        {body ? <Text style={styles.stateBody}>{body}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function StateGlyph({
+  compact,
+  tone,
+}: {
+  readonly compact?: boolean;
+  readonly tone: "muted" | "success" | "warning" | "danger";
+}) {
+  const glyph = tone === "success" ? "✓" : tone === "danger" ? "!" : tone === "warning" ? "!" : "i";
+
+  return (
+    <View style={[styles.stateGlyph, compact ? styles.stateGlyphCompact : null, styles[`stateGlyph_${tone}`]]}>
+      <Text style={[styles.stateGlyphText, compact ? styles.stateGlyphTextCompact : null]}>{glyph}</Text>
     </View>
   );
 }
@@ -2041,22 +2195,11 @@ function ReportStatCard({
   );
 }
 
-function ReportPreviewRow({
-  columns,
-  index,
-  row,
-}: {
-  readonly columns: AdminReportResponse["columns"];
-  readonly index: number;
-  readonly row: AdminReportResponse["rows"][number];
-}) {
-  const visibleColumns = columns.slice(0, 4);
+function MiniFact({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <View style={styles.reportPreviewRow}>
-      <Text style={styles.eyebrow}>Row {index + 1}</Text>
-      {visibleColumns.map((column) => (
-        <DetailRow key={column.key} label={column.label} value={formatReportCell(row[column.key])} />
-      ))}
+    <View style={styles.miniFact}>
+      <Text numberOfLines={1} style={styles.miniFactLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.miniFactValue}>{value}</Text>
     </View>
   );
 }
@@ -2085,6 +2228,30 @@ function SecondaryButton({
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={[styles.secondaryButton, disabled ? styles.disabled : null]}>
       <Text style={styles.secondaryButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ReportDownloadButton({
+  disabled,
+  label,
+  onPress,
+}: {
+  readonly disabled?: boolean;
+  readonly label: string;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`Download ${label}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.downloadActionButton, disabled ? styles.disabled : null]}
+    >
+      <Feather color={theme.color.primary} name="download" size={15} />
+      <Text style={styles.downloadActionText}>{label}</Text>
     </Pressable>
   );
 }
@@ -2155,6 +2322,71 @@ function MetricButton({
   );
 }
 
+function CompactQrStatus({ metrics }: { readonly metrics: AdminDashboard["metrics"] | undefined }) {
+  const total = Math.max(1, metrics?.qrTotal ?? 0);
+  const printed = metrics?.qrPrinted ?? 0;
+  const scanned = metrics?.qrScanned ?? 0;
+  const notPrinted = metrics?.qrNotPrinted ?? 0;
+  const returned = (metrics?.qrCancelled ?? 0) + (metrics?.qrReversed ?? 0);
+  const scanRate = Math.round((scanned / total) * 100);
+
+  return (
+    <View style={styles.qrStatusCard}>
+      <View style={styles.qrStatusHeader}>
+        <View style={styles.rowBody}>
+          <Text style={styles.sectionTitle}>QR status</Text>
+          <Text style={styles.rowMeta}>{scanRate}% scanned across printed and pending QR labels</Text>
+        </View>
+        <View style={styles.qrStatusIcon}>
+          <Feather color={theme.color.primary} name="activity" size={20} />
+        </View>
+      </View>
+      <View style={styles.qrStatusBar}>
+        <View style={[styles.qrStatusBarSegment, styles.qrStatusBarPrinted, { flex: Math.max(printed, 1) }]} />
+        <View style={[styles.qrStatusBarSegment, styles.qrStatusBarScanned, { flex: Math.max(scanned, 1) }]} />
+        <View style={[styles.qrStatusBarSegment, styles.qrStatusBarReturned, { flex: Math.max(returned, 1) }]} />
+      </View>
+      <View style={styles.compactStatusGrid}>
+        <CompactStatusCell iconName="printer" label="Printed" value={printed} tone="warning" />
+        <CompactStatusCell iconName="check-circle" label="Scanned" value={scanned} tone="success" />
+        <CompactStatusCell iconName="inbox" label="Ready" value={notPrinted} tone="muted" />
+        <CompactStatusCell iconName="rotate-ccw" label="Returned" value={returned} tone="danger" />
+      </View>
+    </View>
+  );
+}
+
+function CompactStatusCell({
+  iconName,
+  label,
+  tone,
+  value,
+}: {
+  readonly iconName: FeatherIconName;
+  readonly label: string;
+  readonly tone: "success" | "warning" | "danger" | "muted";
+  readonly value: number;
+}) {
+  const iconColor =
+    tone === "success"
+      ? theme.color.success
+      : tone === "warning"
+        ? theme.color.warning
+        : tone === "danger"
+          ? theme.color.danger
+          : theme.color.muted;
+
+  return (
+    <View style={styles.compactStatusCell}>
+      <View style={[styles.compactStatusIcon, styles[`compactStatusIcon_${tone}`]]}>
+        <Feather color={iconColor} name={iconName} size={15} />
+      </View>
+      <Text style={styles.compactStatusValue}>{value}</Text>
+      <Text numberOfLines={1} style={styles.compactStatusLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function StatusPill({
   label,
   tone,
@@ -2175,25 +2407,27 @@ function StatusPill({
 function DashboardActionCard({
   body,
   eyebrow,
+  iconName,
   onPress,
   title,
 }: {
   readonly body: string;
   readonly eyebrow: string;
+  readonly iconName: FeatherIconName;
   readonly onPress: () => void;
   readonly title: string;
 }) {
   return (
     <Pressable accessibilityLabel={title} accessibilityRole="button" onPress={onPress} style={styles.dashboardActionCard}>
       <View style={styles.actionIcon}>
-        <Text style={styles.actionIconText}>{title.slice(0, 1).toUpperCase()}</Text>
+        <Feather color={theme.color.primary} name={iconName} size={19} />
       </View>
       <View style={styles.rowBody}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
         <Text numberOfLines={1} style={styles.rowTitle}>{title}</Text>
         <Text numberOfLines={2} style={styles.rowMeta}>{body}</Text>
       </View>
-      <Text style={styles.chevronText}>{">"}</Text>
+      <Feather color={theme.color.primary} name="chevron-right" size={18} />
     </Pressable>
   );
 }
@@ -2307,21 +2541,22 @@ function formatDateTime(value: string): string {
   });
 }
 
-function normalizeMobileInput(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 10);
+function formatPoints(value: number): string {
+  return `${new Intl.NumberFormat("en-IN").format(value)} points`;
 }
 
-function formatReportCell(value: unknown): string {
-  if (value === null || value === undefined || value === "") {
-    return "--";
+function formatBytes(value: number): string {
+  if (value < 1024) {
+    return `${value} B`;
   }
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
   }
-  if (typeof value === "number") {
-    return String(value);
-  }
-  return String(value);
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizeMobileInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 10);
 }
 
 function claimStatusLabel(status: AdminRewardClaimLookup["claim"]["status"]): string {
@@ -2340,12 +2575,25 @@ function claimStatusLabel(status: AdminRewardClaimLookup["claim"]["status"]): st
   return humanizeAction(status);
 }
 
+function compactClaimStatusLabel(status: AdminRewardClaimLookup["claim"]["status"]): string {
+  if (status === "CHOSEN") {
+    return "Claim Raised";
+  }
+  if (status === "FULFILLED") {
+    return "Delivered";
+  }
+  if (status === "CANCELLED_BY_CONTRACTOR") {
+    return "Cancelled";
+  }
+  if (status === "REVOKED_DUE_TO_RETURN") {
+    return "Revoked";
+  }
+  return humanizeAction(status);
+}
+
 function rewardSectionLabel(section: AdminRewardSection): string {
   if (section === "CLAIMS") {
     return "Claim Desk";
-  }
-  if (section === "CATALOG") {
-    return "Catalog";
   }
   return "History";
 }
@@ -2358,12 +2606,36 @@ function getReturnOperation(result: ReturnQrResult): ReturnQrMutationResponse["o
   return "operation" in result ? result.operation : undefined;
 }
 
-function upsertRewardCatalog(
-  items: readonly RewardCatalogItem[],
-  nextItem: RewardCatalogItem,
-): readonly RewardCatalogItem[] {
-  const nextItems = items.filter((item) => item.rewardId !== nextItem.rewardId);
-  return [nextItem, ...nextItems].sort((left, right) => left.name.localeCompare(right.name));
+function returnStateTone(status: string): "muted" | "success" | "warning" | "danger" {
+  if (status === "CANCELLED" || status === "REVERSED") {
+    return "success";
+  }
+  if (status === "CAN_REVERSE" || status === "SCANNED_CLAIMED") {
+    return "warning";
+  }
+  if (status === "CAN_CANCEL" || status === "PRINTED_UNCLAIMED" || status === "REPRINTED") {
+    return "warning";
+  }
+  if (status === "EXPIRED" || status === "INVALID" || status === "REVOKED") {
+    return "danger";
+  }
+  return "muted";
+}
+
+function adminTabIconName(routeName: keyof TabParamList): FeatherIconName {
+  if (routeName === "Dashboard") {
+    return "home";
+  }
+  if (routeName === "ReturnScan") {
+    return "maximize";
+  }
+  if (routeName === "Contractors") {
+    return "users";
+  }
+  if (routeName === "Rewards") {
+    return "gift";
+  }
+  return "bar-chart-2";
 }
 
 function upsertStaff(
@@ -2455,6 +2727,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.canvas,
     minWidth: 0,
     width: "100%",
+  },
+  offlineBanner: {
+    backgroundColor: theme.color.danger,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  offlineBannerText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 16,
+    textAlign: "center",
   },
   screen: {
     gap: 14,
@@ -2582,29 +2866,6 @@ const styles = StyleSheet.create({
     top: 7,
     width: 42,
   },
-  eyeShape: {
-    alignItems: "center",
-    borderColor: theme.color.primary,
-    borderRadius: 10,
-    borderWidth: 2,
-    height: 14,
-    justifyContent: "center",
-    transform: [{ scaleX: 1.35 }],
-    width: 18,
-  },
-  eyePupil: {
-    backgroundColor: theme.color.primary,
-    borderRadius: 4,
-    height: 7,
-    width: 7,
-  },
-  eyeSlash: {
-    backgroundColor: theme.color.primary,
-    height: 2,
-    position: "absolute",
-    transform: [{ rotate: "-38deg" }],
-    width: 24,
-  },
   primaryButton: {
     alignItems: "center",
     backgroundColor: theme.color.primary,
@@ -2667,6 +2928,45 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 12,
   },
+  operatorHeroCard: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: 14,
+    padding: 14,
+    ...theme.shadow,
+  },
+  operatorHeroTop: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  adminIdentityRow: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 12,
+    minWidth: 0,
+  },
+  operatorAvatar: {
+    alignItems: "center",
+    backgroundColor: theme.color.primary,
+    borderRadius: 24,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  operatorAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  operatorHeroMetrics: {
+    flexDirection: "row",
+    gap: 8,
+  },
   eyebrow: {
     color: theme.color.accent,
     fontSize: 12,
@@ -2677,6 +2977,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
+  },
+  operatorName: {
+    color: theme.color.text,
+    fontSize: 21,
+    fontWeight: "900",
+    lineHeight: 25,
   },
   muted: {
     color: theme.color.muted,
@@ -2704,6 +3010,17 @@ const styles = StyleSheet.create({
     padding: 16,
     ...theme.shadow,
   },
+  dashboardHeroPanel: {
+    alignItems: "center",
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.lg,
+    flexDirection: "row",
+    gap: 14,
+    justifyContent: "space-between",
+    minHeight: 148,
+    padding: 16,
+    ...theme.shadow,
+  },
   heroCopyColumn: {
     flex: 1,
     minWidth: 0,
@@ -2728,6 +3045,24 @@ const styles = StyleSheet.create({
     color: "#E8F6F7",
     fontSize: 14,
     lineHeight: 20,
+  },
+  heroStatusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  heroStatusChip: {
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,255,255,0.28)",
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
   heroIconBadge: {
     alignItems: "center",
@@ -2779,6 +3114,48 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 3,
   },
+  lightMetricRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  lightMetric: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 76,
+    minWidth: 0,
+    padding: 12,
+  },
+  lightMetricCompact: {
+    minHeight: 66,
+    padding: 10,
+  },
+  lightMetricEmphasis: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
+  },
+  lightMetricValue: {
+    color: theme.color.text,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  lightMetricValueWrap: {
+    fontSize: 18,
+    lineHeight: 21,
+  },
+  lightMetricValueEmphasis: {
+    color: theme.color.primary,
+  },
+  lightMetricLabel: {
+    color: theme.color.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: 2,
+  },
   sectionHeader: {
     marginTop: 4,
   },
@@ -2786,6 +3163,92 @@ const styles = StyleSheet.create({
     color: theme.color.text,
     fontSize: 17,
     fontWeight: "900",
+  },
+  qrStatusCard: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+    ...theme.shadow,
+  },
+  qrStatusHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  qrStatusIcon: {
+    alignItems: "center",
+    backgroundColor: theme.color.primarySoft,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  qrStatusBar: {
+    borderRadius: 999,
+    flexDirection: "row",
+    height: 8,
+    overflow: "hidden",
+  },
+  qrStatusBarSegment: {
+    height: 8,
+  },
+  qrStatusBarPrinted: {
+    backgroundColor: "#F4C27D",
+  },
+  qrStatusBarScanned: {
+    backgroundColor: theme.color.success,
+  },
+  qrStatusBarReturned: {
+    backgroundColor: theme.color.danger,
+  },
+  compactStatusGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  compactStatusCell: {
+    backgroundColor: "#F8FBFB",
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: 0,
+    padding: 9,
+  },
+  compactStatusIcon: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  compactStatusIcon_success: {
+    backgroundColor: "#E6F5EE",
+  },
+  compactStatusIcon_warning: {
+    backgroundColor: theme.color.accentSoft,
+  },
+  compactStatusIcon_danger: {
+    backgroundColor: "#FDECEC",
+  },
+  compactStatusIcon_muted: {
+    backgroundColor: "#EAF1F2",
+  },
+  compactStatusValue: {
+    color: theme.color.text,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 7,
+  },
+  compactStatusLabel: {
+    color: theme.color.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 1,
+    textTransform: "uppercase",
   },
   statusStrip: {
     gap: 10,
@@ -2866,20 +3329,25 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  tabGlyph: {
+  downloadActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  downloadActionButton: {
     alignItems: "center",
-    borderRadius: 11,
+    backgroundColor: "#EAF1F2",
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    height: 22,
-    justifyContent: "center",
-    minWidth: 24,
-    paddingHorizontal: 5,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 38,
+    paddingHorizontal: 12,
   },
-  tabGlyphActive: {
-    backgroundColor: theme.color.primarySoft,
-  },
-  tabGlyphText: {
-    fontSize: 10,
+  downloadActionText: {
+    color: theme.color.primary,
+    fontSize: 12,
     fontWeight: "900",
   },
   actionChip: {
@@ -2898,6 +3366,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
+  stateCard: {
+    alignItems: "center",
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  stateCard_muted: {
+    backgroundColor: "#EAF1F2",
+    borderColor: theme.color.line,
+  },
+  stateCard_success: {
+    backgroundColor: "#E6F5EE",
+    borderColor: "#B5E2CD",
+  },
+  stateCard_warning: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: "#FFD7A8",
+  },
+  stateCard_danger: {
+    backgroundColor: "#FDECEC",
+    borderColor: "#F7B4AF",
+  },
+  stateTitle: {
+    color: theme.color.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  stateBody: {
+    color: theme.color.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  stateGlyph: {
+    alignItems: "center",
+    borderRadius: 28,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  stateGlyphCompact: {
+    borderRadius: 21,
+    height: 42,
+    width: 42,
+  },
+  stateGlyph_muted: {
+    backgroundColor: "#DDE8EA",
+  },
+  stateGlyph_success: {
+    backgroundColor: "#DDF3E9",
+  },
+  stateGlyph_warning: {
+    backgroundColor: "#FFF0DF",
+  },
+  stateGlyph_danger: {
+    backgroundColor: "#FDECEC",
+  },
+  stateGlyphText: {
+    color: theme.color.primary,
+    fontSize: 26,
+    fontWeight: "900",
+  },
+  stateGlyphTextCompact: {
+    fontSize: 20,
+  },
   activityRow: {
     alignItems: "center",
     backgroundColor: theme.color.surface,
@@ -2914,6 +3449,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
   },
+  entityTitleText: {
+    flex: 1,
+    minWidth: 0,
+  },
   rowMeta: {
     color: theme.color.muted,
     fontSize: 13,
@@ -2924,6 +3463,50 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     fontSize: 12,
     fontWeight: "800",
+  },
+  panelHeaderRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minWidth: 0,
+  },
+  entityHeaderRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    minWidth: 0,
+  },
+  rowFactStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  miniFact: {
+    backgroundColor: "#F8FBFB",
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    flexBasis: "31%",
+    flexGrow: 1,
+    minHeight: 42,
+    minWidth: 76,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  miniFactLabel: {
+    color: theme.color.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  miniFactValue: {
+    color: theme.color.text,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 2,
   },
   contractorRow: {
     alignItems: "center",
@@ -2951,6 +3534,14 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     width: "100%",
   },
+  rewardMobileImageMissing: {
+    alignItems: "center",
+    backgroundColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    height: 126,
+    justifyContent: "center",
+    width: "100%",
+  },
   rewardMobileRow: {
     alignItems: "center",
     backgroundColor: theme.color.surface,
@@ -2974,6 +3565,10 @@ const styles = StyleSheet.create({
     minHeight: 92,
     padding: 12,
     ...theme.shadow,
+  },
+  rewardClaimRowSelected: {
+    backgroundColor: theme.color.primarySoft,
+    borderColor: theme.color.primary,
   },
   rewardHistoryRow: {
     alignItems: "flex-start",
@@ -3128,6 +3723,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 18,
   },
+  scanEyebrow: {
+    color: "#F9BF78",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
   scanTitle: {
     color: "#FFFFFF",
     fontSize: 18,
@@ -3139,6 +3740,117 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     maxWidth: 290,
     textAlign: "center",
+  },
+  returnStepStrip: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  returnStep: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 94,
+    padding: 10,
+  },
+  returnStepLabel: {
+    color: theme.color.accent,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  returnStepText: {
+    color: theme.color.text,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  cameraNotice: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    padding: 14,
+  },
+  cameraNoticeText: {
+    color: theme.color.muted,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  cameraPermissionCard: {
+    backgroundColor: "#EEF8F7",
+    borderColor: theme.color.primary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  cameraScannerCard: {
+    backgroundColor: "#071A1D",
+    borderRadius: theme.radius.lg,
+    gap: 10,
+    overflow: "hidden",
+    padding: 10,
+  },
+  cameraPreviewShell: {
+    aspectRatio: 1,
+    backgroundColor: "#071A1D",
+    borderRadius: theme.radius.md,
+    overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  cameraPreview: {
+    height: "100%",
+    width: "100%",
+  },
+  cameraOverlay: {
+    alignItems: "center",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  cameraFrame: {
+    borderColor: "#FFFFFF",
+    borderRadius: theme.radius.md,
+    borderWidth: 3,
+    height: "62%",
+    opacity: 0.92,
+    width: "62%",
+  },
+  cameraScannerTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  cameraScannerHint: {
+    color: "#C8DDDF",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 19,
+    paddingBottom: 4,
+    textAlign: "center",
+  },
+  manualScanFallback: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  manualScanTitle: {
+    color: theme.color.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   returnCard: {
     backgroundColor: theme.color.surface,
@@ -3161,14 +3873,14 @@ const styles = StyleSheet.create({
   },
   returnProduct: {
     color: theme.color.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "900",
-    lineHeight: 25,
+    lineHeight: 22,
     flex: 1,
   },
   returnBadge: {
     borderRadius: theme.radius.sm,
-    maxWidth: 132,
+    maxWidth: 112,
     paddingHorizontal: 9,
     paddingVertical: 7,
   },
@@ -3188,6 +3900,7 @@ const styles = StyleSheet.create({
     color: theme.color.text,
     fontSize: 11,
     fontWeight: "900",
+    lineHeight: 15,
     textAlign: "center",
   },
   returnDetailGrid: {
@@ -3256,6 +3969,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 19,
   },
+  warningCopyNeutral: {
+    color: theme.color.warning,
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 19,
+  },
   claimLine: {
     color: theme.color.muted,
     fontSize: 13,
@@ -3265,6 +3984,14 @@ const styles = StyleSheet.create({
   nonActionPanel: {
     backgroundColor: "#F8FBFB",
     borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: 12,
+  },
+  returnWarningCard: {
+    backgroundColor: theme.color.accentSoft,
+    borderColor: "#FFD7A8",
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: 4,
@@ -3327,6 +4054,48 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: "space-between",
     padding: 14,
+  },
+  shortcutBadge: {
+    backgroundColor: theme.color.primarySoft,
+    borderRadius: theme.radius.sm,
+    color: theme.color.primary,
+    flexShrink: 0,
+    fontSize: 11,
+    fontWeight: "900",
+    maxWidth: 112,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    textAlign: "center",
+  },
+  reportChartCard: {
+    backgroundColor: theme.color.surface,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+    ...theme.shadow,
+  },
+  chartSegmentRow: {
+    alignItems: "center",
+    backgroundColor: "#F8FBFB",
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 54,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chartSegmentValue: {
+    color: theme.color.primary,
+    flexShrink: 0,
+    fontSize: 18,
+    fontWeight: "900",
+    minWidth: 42,
+    textAlign: "right",
   },
   reportPreviewPanel: {
     backgroundColor: theme.color.surface,

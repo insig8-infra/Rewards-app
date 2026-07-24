@@ -31,8 +31,8 @@ export class AdminMobileStaffController {
   updateMyStaffPhoto(
     @CurrentActor() actor: AuthenticatedActor,
     @Body() body: AdminStaffPhotoInput,
-  ): ReturnType<AdminStaffService["updateStaffPhoto"]> {
-    return this.staff.getMyStaff(actor).then((staff) => this.staff.updateStaffPhoto(staff.staffId, body, actor));
+  ): ReturnType<AdminStaffService["updateMyStaffPhoto"]> {
+    return this.staff.updateMyStaffPhoto(body, actor);
   }
 
   @Get(":staffId")

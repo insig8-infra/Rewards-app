@@ -26,6 +26,16 @@ test("mobile dev fallbacks can be disabled together for UAT discipline", () => {
   assert.equal(features.showMockOtp, false);
 });
 
+test("mobile dev fallbacks can be explicitly enabled for internal proof exports", () => {
+  const features = resolveMobileDevFeatures({
+    isDev: false,
+    env: { EXPO_PUBLIC_ENABLE_DEV_FALLBACKS: "true" },
+  });
+
+  assert.equal(features.allowManualQrEntry, true);
+  assert.equal(features.showMockOtp, true);
+});
+
 test("mobile dev fallback switches are individually disableable", () => {
   const features = resolveMobileDevFeatures({
     isDev: true,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ACTOR_ROLE } from "@volt-rewards/domain";
-import { createReportPdf, createReportXlsx } from "./report-file-generators.js";
+import { createReportCsv, createReportPdf, createReportXlsx } from "./report-file-generators.js";
 import { ReportsService } from "./reports.service.js";
 import type { AdminWebReportsRepository } from "./admin-web-reports.repository.js";
 import type { AdminReportFilters, AdminReportResponse, AdminReportsLanding } from "./reports.types.js";
@@ -40,12 +40,15 @@ const filters: AdminReportFilters = {
   pageSize: 25,
 };
 
-test("report file generators create PDF and XLSX bytes without external runtime dependencies", () => {
+test("report file generators create PDF, CSV, and XLSX bytes without external runtime dependencies", () => {
   const pdf = createReportPdf(report);
+  const csv = createReportCsv(report);
   const xlsx = createReportXlsx(report);
 
   assert.equal(pdf.subarray(0, 8).toString("utf8"), "%PDF-1.4");
   assert.match(pdf.toString("utf8"), /QR Status Report/);
+  assert.match(csv.toString("utf8"), /Invoice,Product,Printed,Claimed/);
+  assert.match(csv.toString("utf8"), /VR\/26-27\/1001,Havells Wire,1,0/);
   assert.equal(xlsx.subarray(0, 2).toString("utf8"), "PK");
   assert.match(xlsx.toString("latin1"), /\[Content_Types\]\.xml/);
   assert.match(xlsx.toString("latin1"), /xl\/worksheets\/sheet1\.xml/);
@@ -87,4 +90,35 @@ test("ReportsService exports all filtered rows and records export audit metadata
   assert.equal(exported.contentType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   assert.equal(exported.buffer.subarray(0, 2).toString("utf8"), "PK");
   assert.match(exported.fileName, /^qr-status-\d{4}-\d{2}-\d{2}\.xlsx$/);
+});
+
+test("ReportsService exports CSV for mobile download workflows", async () => {
+  let capturedAuditFormat: string | null = null;
+  const repository: AdminWebReportsRepository = {
+    getLanding: async (): Promise<AdminReportsLanding> => ({
+      resolvedRange: report.resolvedRange,
+      generatedAt: new Date("2026-07-08T00:00:00.000Z"),
+      cards: [],
+      reportShortcuts: [],
+      charts: [],
+    }),
+    getReport: async () => report,
+    recordExport: async (input) => {
+      capturedAuditFormat = input.format;
+      assert.equal(input.actor.role, ACTOR_ROLE.ADMIN);
+    },
+  };
+  const service = new ReportsService(repository);
+
+  const exported = await service.exportReport({
+    actor: { role: ACTOR_ROLE.ADMIN, userId: "admin_1" },
+    reportId: "qr-status",
+    format: "CSV",
+    filters,
+  });
+
+  assert.equal(capturedAuditFormat, "CSV");
+  assert.equal(exported.contentType, "text/csv; charset=utf-8");
+  assert.match(exported.buffer.toString("utf8"), /Invoice,Product,Printed,Claimed/);
+  assert.match(exported.fileName, /^qr-status-\d{4}-\d{2}-\d{2}\.csv$/);
 });

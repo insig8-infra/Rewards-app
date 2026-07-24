@@ -67,8 +67,8 @@ export function fulfillReward(
   claim: RewardClaim,
   input: { readonly actorRole: ActorRole; readonly otpVerified: boolean },
 ): RewardClaim {
-  if (input.actorRole !== ACTOR_ROLE.OWNER) {
-    throw new DomainError("REWARD_FULFILL_OWNER_ONLY", "Only OWNER can fulfill rewards in v1.");
+  if (input.actorRole !== ACTOR_ROLE.OWNER && input.actorRole !== ACTOR_ROLE.ADMIN) {
+    throw new DomainError("REWARD_FULFILL_OWNER_ONLY", "Only OWNER/Admin can fulfill rewards in v1.");
   }
 
   if (!input.otpVerified) {

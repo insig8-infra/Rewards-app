@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ACTOR_ROLE, type ActorRole } from "@volt-rewards/domain";
+import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import type {
   AdminWebDashboard,
@@ -16,8 +17,10 @@ import type {
 export class PrismaAdminWebDashboardRepository implements AdminWebDashboardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboard(actorRole: ActorRole): Promise<AdminWebDashboard> {
+  async getDashboard(actor: AuthenticatedActor): Promise<AdminWebDashboard> {
+    const actorRole = actor.role;
     const [
+      actorUser,
       contractors,
       staff,
       invoices,
@@ -34,11 +37,17 @@ export class PrismaAdminWebDashboardRepository implements AdminWebDashboardRepos
       topContractors,
       itemCodesNeedingAttention,
     ] = await Promise.all([
+      actor.userId
+        ? this.prisma.user.findUnique({
+            where: { id: actor.userId },
+            select: { displayName: true, role: true },
+          })
+        : Promise.resolve(null),
       this.prisma.contractor.count({
         where: { status: "ACTIVE" },
       }),
       this.prisma.staffProfile.count({
-        where: { deactivatedAt: null },
+        where: { deactivatedAt: null, user: { role: "STAFF" } },
       }),
       this.prisma.busyInvoice.count(),
       this.prisma.rewardClaim.count(),
@@ -180,7 +189,9 @@ export class PrismaAdminWebDashboardRepository implements AdminWebDashboardRepos
 
     return {
       actorRole,
-      roleLabel: actorRole === ACTOR_ROLE.OWNER ? "Owner dashboard" : "Staff dashboard",
+      ...optionalString("actorName", actorUser?.displayName),
+      actorLabel: formatActorLabel(actorRole, actorUser?.displayName),
+      roleLabel: getRoleLabel(actorRole),
       allowedSections: getAllowedSections(actorRole),
       metrics: {
         contractors,
@@ -231,6 +242,23 @@ function getActivePrintedCount(qrCountByStatus: ReadonlyMap<string, number>): nu
   return (qrCountByStatus.get("PRINTED_UNCLAIMED") ?? 0) + (qrCountByStatus.get("REPRINTED") ?? 0);
 }
 
+function getRoleLabel(actorRole: ActorRole): string {
+  switch (actorRole) {
+    case ACTOR_ROLE.OWNER:
+      return "Owner dashboard";
+    case ACTOR_ROLE.ADMIN:
+      return "Admin dashboard";
+    case ACTOR_ROLE.STAFF:
+      return "Staff dashboard";
+    default:
+      return "Admin dashboard";
+  }
+}
+
+function formatActorLabel(actorRole: ActorRole, actorName: string | null | undefined): string {
+  return actorName ? `${actorRole} - ${actorName}` : actorRole;
+}
+
 function getAllowedSections(actorRole: ActorRole): readonly string[] {
   if (actorRole === ACTOR_ROLE.OWNER) {
     return [
@@ -239,7 +267,24 @@ function getAllowedSections(actorRole: ActorRole): readonly string[] {
       "invoices",
       "print-history",
       "contractors",
+      "admins",
       "staff",
+      "rewards",
+      "reports",
+      "promotions",
+      "item-codes",
+    ];
+  }
+
+  if (actorRole === ACTOR_ROLE.ADMIN) {
+    return [
+      "dashboard",
+      "qr-print",
+      "invoices",
+      "print-history",
+      "contractors",
+      "staff",
+      "profile",
       "rewards",
       "reports",
       "promotions",
@@ -299,7 +344,7 @@ function buildAttentionQueue(input: {
   });
 
   const rewardItems =
-    input.actorRole === ACTOR_ROLE.OWNER
+    input.actorRole === ACTOR_ROLE.OWNER || input.actorRole === ACTOR_ROLE.ADMIN
       ? input.pendingClaims.map<AdminWebDashboardAttentionItem>((claim) => ({
           id: `reward:${claim.id}`,
           type: "PENDING_REWARD",
@@ -402,18 +447,29 @@ function buildShortcuts(actorRole: ActorRole): readonly AdminWebDashboardShortcu
     },
   ];
 
-  if (actorRole !== ACTOR_ROLE.OWNER) {
+  if (actorRole === ACTOR_ROLE.STAFF) {
     return common;
   }
 
   return [
     ...common,
+    ...(actorRole === ACTOR_ROLE.OWNER
+      ? [
+          {
+            label: "Admins",
+            description: "Create and control Admin accounts",
+            href: "/admins",
+            icon: "staff",
+            ownerOnly: true,
+          },
+        ]
+      : []),
     {
       label: "Staff Management",
       description: "Create, reset, and deactivate staff",
       href: "/staff",
       icon: "staff",
-      ownerOnly: true,
+      ownerOnly: actorRole === ACTOR_ROLE.OWNER,
     },
     {
       label: "Rewards",

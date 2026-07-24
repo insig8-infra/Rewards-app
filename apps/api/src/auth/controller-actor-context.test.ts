@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BadRequestException, UnauthorizedException } from "@nestjs/common";
-import { ACTOR_ROLE, DomainError, type ActorRole } from "@volt-rewards/domain";
+import { ACTOR_ROLE, DomainError } from "@volt-rewards/domain";
 import { AdminWebDashboardController } from "../admin-web/admin-web-dashboard.controller.js";
 import type { AdminWebDashboardService } from "../admin-web/admin-web-dashboard.service.js";
 import { AdminWebBusyController } from "../busy/admin-web-busy.controller.js";
@@ -542,31 +542,23 @@ test("AdminWebInvoicesController returns persisted invoice detail by id", async 
         qrUnitCount: 1,
         printedUnitCount: 0,
         notPrintedUnitCount: 1,
+        printableUnitCount: 1,
+        scannedUnitCount: 0,
+        cancelledUnitCount: 0,
+        reversedUnitCount: 0,
+        returnedUnitCount: 0,
+        returnVoucherCount: 0,
+        reviewNeededCount: 0,
+        productSummary: "Cable",
+        categorySummary: "Electrical",
         status: "IMPORTED",
-        seller: {
-          name: "Volt Electricals",
-          addressLine1: "Shop 14",
-          city: "Mumbai",
-          state: "Maharashtra",
-          pincode: "400069",
-        },
         customer: {
           name: "Sharma Electrical Contractors",
-          addressLine1: "Plot 21",
-          city: "Mumbai",
           state: "Maharashtra",
-          pincode: "400076",
         },
-        placeOfSupply: "Maharashtra",
-        taxableSubtotal: "32300.00",
-        discountTotal: "0.00",
-        freightTotal: "0.00",
-        cgstTotal: "2907.00",
-        sgstTotal: "2907.00",
-        igstTotal: "0.00",
-        totalAmount: "38114.00",
-        roundOff: "0.00",
         lines: [],
+        returnHistory: [],
+        printHistory: [],
       });
     },
   } as unknown as AdminWebInvoiceReadService);
@@ -578,12 +570,13 @@ test("AdminWebInvoicesController returns persisted invoice detail by id", async 
 });
 
 test("AdminWebDashboardController scopes dashboard by current actor role", async () => {
-  let actorRole = "";
+  let actor: AuthenticatedActor | undefined;
   const controller = new AdminWebDashboardController({
-    getDashboard: (inputRole: ActorRole) => {
-      actorRole = inputRole;
+    getDashboard: (inputActor: AuthenticatedActor) => {
+      actor = inputActor;
       return Promise.resolve({
-        actorRole: inputRole,
+        actorRole: inputActor.role,
+        actorLabel: `${inputActor.role} - ${inputActor.userId}`,
         roleLabel: "Owner dashboard",
         allowedSections: ["dashboard"],
         metrics: {
@@ -613,7 +606,7 @@ test("AdminWebDashboardController scopes dashboard by current actor role", async
 
   await controller.getDashboard({ role: ACTOR_ROLE.OWNER, userId: "owner_user_1" });
 
-  assert.equal(actorRole, ACTOR_ROLE.OWNER);
+  assert.deepEqual(actor, { role: ACTOR_ROLE.OWNER, userId: "owner_user_1" });
 });
 
 test("AdminWebContractorsController passes actor context to contractor registration", async () => {
@@ -631,7 +624,11 @@ test("AdminWebContractorsController passes actor context to contractor registrat
       availablePoints: 0,
       siteCount: 0,
       scanCount: 0,
+      successfulScanCount: 0,
+      scannedBusinessInr: "0.00",
       rewardClaimCount: 0,
+      fulfilledRewardCount: 0,
+      fulfilledRewardValueInr: 0,
       createdAt: new Date("2026-06-22T00:00:00.000Z"),
       sites: [],
     }),
@@ -648,7 +645,11 @@ test("AdminWebContractorsController passes actor context to contractor registrat
         availablePoints: 0,
         siteCount: 0,
         scanCount: 0,
+        successfulScanCount: 0,
+        scannedBusinessInr: "0.00",
         rewardClaimCount: 0,
+        fulfilledRewardCount: 0,
+        fulfilledRewardValueInr: 0,
         createdAt: new Date("2026-06-22T00:00:00.000Z"),
         sites: [],
       });
@@ -682,7 +683,11 @@ test("AdminMobileContractorsController exposes owner actions with guarded actor 
     availablePoints: 0,
     siteCount: 0,
     scanCount: 0,
+    successfulScanCount: 0,
+    scannedBusinessInr: "0.00",
     rewardClaimCount: 0,
+    fulfilledRewardCount: 0,
+    fulfilledRewardValueInr: 0,
     createdAt: new Date("2026-06-22T00:00:00.000Z"),
     sites: [],
   };
@@ -736,6 +741,7 @@ test("AdminMobileStaffController passes guarded actor context to staff mutations
   const staff = {
     staffId: "staff_1",
     userId: "staff_user_1",
+    role: "STAFF",
     name: "Aarti Deshmukh",
     mobileNumber: "9000000092",
     status: "ACTIVE",

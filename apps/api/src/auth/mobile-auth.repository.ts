@@ -3,6 +3,8 @@ import type { AuthenticatedActor } from "./authenticated-actor.js";
 
 export const MOBILE_AUTH_REPOSITORY = Symbol("MOBILE_AUTH_REPOSITORY");
 
+export type AdminAuthRole = "OWNER" | "ADMIN" | "STAFF";
+
 export interface ContractorAuthProfile {
   readonly contractorId: string;
   readonly userId: string;
@@ -22,7 +24,7 @@ export interface ContractorAuthProfile {
 
 export interface AdminAuthProfile {
   readonly userId: string;
-  readonly role: "OWNER" | "STAFF";
+  readonly role: AdminAuthRole;
   readonly name: string;
   readonly mobileNumber: string;
   readonly photoUrl?: string;
@@ -60,7 +62,7 @@ export interface CreateSessionInput {
 }
 
 export interface MobileAuthRepository {
-  findAdminByMobileAndRole(mobileNumber: string, role: "OWNER" | "STAFF"): Promise<AdminAuthProfile | null>;
+  findAdminByMobileAndRole(mobileNumber: string, role: AdminAuthRole): Promise<AdminAuthProfile | null>;
   findContractorByMobile(mobileNumber: string): Promise<ContractorAuthProfile | null>;
   getContractorById(contractorId: string): Promise<ContractorAuthProfile | null>;
   setTemporaryMpin(

@@ -2,7 +2,7 @@ import { AdminPromotionsWorkspace } from "../../src/components/AdminPromotionsWo
 import { requireAdminSession } from "../../src/auth/adminSession";
 
 export default async function PromotionsPage() {
-  const session = await requireAdminSession({ allowedRoles: ["OWNER"], loginRedirectTo: "/promotions" });
+  const session = await requireAdminSession({ allowedRoles: ["OWNER", "ADMIN"], loginRedirectTo: "/promotions" });
 
   return <AdminPromotionsWorkspace session={session} />;
 }

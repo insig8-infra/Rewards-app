@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, LockKeyhole, RefreshCw, Search, Send, ShieldCheck, Upload } from "lucide-react";
+import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, ImagePlus, Loader2, LockKeyhole, RefreshCw, Search, Send, ShieldCheck, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   type AdminRewardClaimHistoryEntry,
@@ -59,7 +59,7 @@ export function AdminRewardsWorkspace({ session }: { readonly session: AdminSess
 function RewardsContent() {
   const { actorRole } = useAdminActor();
   const api = useMemo(() => createAdminApiClient(), []);
-  const isOwner = actorRole === "OWNER";
+  const canManageRewards = actorRole === "OWNER" || actorRole === "ADMIN";
   const [mode, setMode] = useState<RewardsWorkspaceMode>("landing");
   const [claims, setClaims] = useState<readonly AdminRewardClaimLookup[]>([]);
   const [history, setHistory] = useState<readonly AdminRewardClaimHistoryEntry[]>([]);
@@ -101,7 +101,7 @@ function RewardsContent() {
 
   async function fetchRewardState(input: { readonly preserveSelected: boolean; readonly autoSelectFirst?: boolean }): Promise<void> {
     const [nextClaims, nextHistory] = await Promise.all([
-      isOwner ? api.listRewardClaims() : Promise.resolve([]),
+      canManageRewards ? api.listRewardClaims() : Promise.resolve([]),
       api.listRewardClaimHistory(),
     ]);
     const selectedClaim = input.preserveSelected && lookup
@@ -112,10 +112,10 @@ function RewardsContent() {
 
     setClaims(nextClaims);
     setHistory(nextHistory);
-    setLookup(isOwner ? selectedClaim : null);
+    setLookup(canManageRewards ? selectedClaim : null);
     setOtpResult(null);
     setOtp("");
-    if (isOwner && selectedClaim) {
+    if (canManageRewards && selectedClaim) {
       setClaimId(selectedClaim.claim.claimId);
     } else if (!input.preserveSelected || !lookup) {
       setClaimId("");
@@ -239,11 +239,11 @@ function RewardsContent() {
     });
   }
 
-  const canSubmitLookup = isOwner && claimId.trim().length > 0 && loading === null;
-  const canSendOtp = isOwner && Boolean(lookup?.canSendOtp) && loading === null;
-  const canFulfill = isOwner && Boolean(lookup?.canFulfill && otpResult && otp.length === 6) && loading === null;
+  const canSubmitLookup = canManageRewards && claimId.trim().length > 0 && loading === null;
+  const canSendOtp = canManageRewards && Boolean(lookup?.canSendOtp) && loading === null;
+  const canFulfill = canManageRewards && Boolean(lookup?.canFulfill && otpResult && otp.length === 6) && loading === null;
 
-  if (isOwner && mode === "catalog") {
+  if (canManageRewards && mode === "catalog") {
     return (
       <section className="content">
         <div className="page-intro catalog-page-intro">
@@ -267,7 +267,7 @@ function RewardsContent() {
       <div className="page-intro">
         <div>
           <div className="eyebrow">Reward claims</div>
-          <h2>{isOwner ? "Fulfill Claim Raised requests and inspect reward history" : "Reward history across contractors"}</h2>
+          <h2>{canManageRewards ? "Fulfill Claim Raised requests and inspect reward history" : "Reward history across contractors"}</h2>
           <span className={status.tone === "error" ? "status error" : status.tone === "success" ? "status success" : "status"}>
             {status.message}
           </span>
@@ -282,7 +282,7 @@ function RewardsContent() {
             {loading === "claims" ? <Loader2 size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
             Refresh Claim Requests
           </button>
-          {isOwner ? (
+          {canManageRewards ? (
             <button className="button primary" type="button" onClick={() => setMode("catalog")}>
               <ImagePlus size={16} aria-hidden="true" />
               Manage Reward Catalog
@@ -292,13 +292,13 @@ function RewardsContent() {
       </div>
 
       <div className="summary-grid">
-        <Metric label="Claim Raised" value={String(claims.length)} meta={isOwner ? `${visibleClaims.length} visible` : "OWNER fulfillment only"} />
-        <Metric label="Delivered" value={String(deliveredCount)} meta="Fulfilled by OWNER" />
+        <Metric label="Claim Raised" value={String(claims.length)} meta={canManageRewards ? `${visibleClaims.length} visible` : "OWNER/Admin fulfillment only"} />
+        <Metric label="Delivered" value={String(deliveredCount)} meta="Fulfilled by OWNER/Admin" />
         <Metric label="History records" value={String(history.length)} meta={`${visibleHistory.length} visible`} />
         <Metric label="Cancelled / Revoked" value={String(cancelledOrRevokedCount)} meta="History only" />
       </div>
 
-      {isOwner ? (
+      {canManageRewards ? (
         <section className="workspace">
           <section className="panel" aria-label="Claim Desk">
             <div className="panel-header">
@@ -384,7 +384,7 @@ function RewardsContent() {
               </div>
               <span className="badge good">
                 <ShieldCheck size={14} aria-hidden="true" />
-                OWNER only
+                OWNER / ADMIN
               </span>
             </div>
 
@@ -709,7 +709,7 @@ function RewardCatalogManager() {
       <div className="panel-header">
         <div>
           <h2 className="panel-title">Reward Catalog Management</h2>
-          <div className="panel-subtitle">OWNER-managed reward list, stock, images, and CSV import</div>
+          <div className="panel-subtitle">OWNER/Admin-managed reward list, stock, images, and CSV import</div>
         </div>
         <button className="button compact" disabled={busy} type="button" onClick={() => void loadCatalog()}>
           {busy ? <Loader2 size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
@@ -1013,14 +1013,14 @@ function RewardHistoryPanel(props: {
           <table className="data-table reward-history-table">
             <thead>
               <tr>
-                <th scope="col"><TableSortButton column="claim-id" label="Claim ID" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="contractor" label="Contractor" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="phone" label="Phone" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="reward" label="Reward" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="points" label="Points Spent" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="claimed" label="Claimed Date/Time" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="fulfilled" label="Fulfilled Date/Time" onSort={sortBy} sort={props.historySort} /></th>
-                <th scope="col"><TableSortButton column="status" label="Development" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "claim-id")}><TableSortButton column="claim-id" label="Claim ID" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "contractor")}><TableSortButton column="contractor" label="Contractor" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "phone")}><TableSortButton column="phone" label="Phone" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "reward")}><TableSortButton column="reward" label="Reward" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "points")}><TableSortButton column="points" label="Points Spent" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "claimed")}><TableSortButton column="claimed" label="Claimed Date/Time" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "fulfilled")}><TableSortButton column="fulfilled" label="Fulfilled Date/Time" onSort={sortBy} sort={props.historySort} /></th>
+                <th scope="col" aria-sort={historySortAria(props.historySort, "status")}><TableSortButton column="status" label="Development" onSort={sortBy} sort={props.historySort} /></th>
               </tr>
             </thead>
             <tbody>
@@ -1079,12 +1079,24 @@ function TableSortButton({
   readonly onSort: (column: HistorySortColumn) => void;
   readonly sort: HistorySort;
 }) {
-  const active = sort.startsWith(`${column === "claimed" ? "claimed" : column === "points" ? "points" : column}-`);
+  const direction = historySortDirection(sort, column);
+  const active = direction !== null;
   return (
-    <button className={`table-sort-button ${active ? "active" : ""}`} type="button" onClick={() => onSort(column)}>
-      {label}
+    <button className={`column-sort-button ${active ? "active" : ""}`} type="button" onClick={() => onSort(column)}>
+      <span>{label}</span>
+      <HistorySortIndicator direction={direction} />
     </button>
   );
+}
+
+function HistorySortIndicator({ direction }: { readonly direction: "ascending" | "descending" | null }) {
+  if (direction === "ascending") {
+    return <ChevronUp size={14} aria-hidden="true" />;
+  }
+  if (direction === "descending") {
+    return <ChevronDown size={14} aria-hidden="true" />;
+  }
+  return <ArrowDownUp size={14} aria-hidden="true" />;
 }
 
 function filterClaims(
@@ -1220,6 +1232,19 @@ function nextHistorySort(current: HistorySort, column: HistorySortColumn): Histo
   };
   const [primary, alternate] = pairs[column];
   return current === primary ? alternate : primary;
+}
+
+function historySortAria(sort: HistorySort, column: HistorySortColumn): "ascending" | "descending" | "none" {
+  return historySortDirection(sort, column) ?? "none";
+}
+
+function historySortDirection(sort: HistorySort, column: HistorySortColumn): "ascending" | "descending" | null {
+  const separatorIndex = sort.lastIndexOf("-");
+  const activeColumn = sort.slice(0, separatorIndex);
+  if (activeColumn !== column) {
+    return null;
+  }
+  return sort.endsWith("-asc") ? "ascending" : "descending";
 }
 
 function resolveHistoryRange(rangePreset: HistoryRangePreset, from: string, to: string): { readonly from?: Date; readonly to?: Date } {

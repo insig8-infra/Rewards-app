@@ -1,16 +1,18 @@
+.DS_Store
 .env
 .env.*
 !.env.example
 .git
+.github
 .next
-.expo
 .npm-cache
 .playwright-mcp
-node_modules
-**/node_modules
+.expo
+coverage
 dist
 **/dist
-coverage
+node_modules
+**/node_modules
 tmp
 output
 *.png
@@ -19,3 +21,4 @@ output
 *.pdf
 admin-web-*.png
 mobile-*.png
+*.log

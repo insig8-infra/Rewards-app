@@ -41,7 +41,7 @@ export function AdminItemCodesWorkspace({ session }: { readonly session: AdminSe
 function ItemCodesContent() {
   const api = useMemo(() => createAdminApiClient(), []);
   const { actorRole } = useAdminActor();
-  const isOwner = actorRole === "OWNER";
+  const canManageRules = actorRole === "OWNER" || actorRole === "ADMIN";
   const [items, setItems] = useState<readonly AdminItemCode[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [query, setQuery] = useState("");
@@ -86,7 +86,7 @@ function ItemCodesContent() {
   }
 
   async function refreshFromBusy(): Promise<void> {
-    if (!isOwner) {
+    if (!canManageRules) {
       return;
     }
     setBusy(true);
@@ -112,7 +112,7 @@ function ItemCodesContent() {
   }
 
   async function saveRule(): Promise<void> {
-    if (!selectedItem || !isOwner || draftError) {
+    if (!selectedItem || !canManageRules || draftError) {
       return;
     }
     setBusy(true);
@@ -149,7 +149,7 @@ function ItemCodesContent() {
             {busy ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
             Refresh
           </button>
-          {isOwner ? (
+          {canManageRules ? (
             <button className="button primary" type="button" onClick={() => void refreshFromBusy()} disabled={busy}>
               <Tags size={16} aria-hidden="true" />
               Sync BUSY ItemCodes
@@ -247,7 +247,7 @@ function ItemCodesContent() {
                     <td>{item.lastBusySyncAt ? formatDateTime(item.lastBusySyncAt) : "Not synced"}</td>
                     <td className="action-cell">
                       <button className="button compact" type="button" onClick={() => selectItem(item)}>
-                        {isOwner ? "Edit" : "View"}
+                        {canManageRules ? "Edit" : "View"}
                       </button>
                     </td>
                   </tr>
@@ -275,12 +275,12 @@ function ItemCodesContent() {
                 </div>
               </div>
 
-              {!isOwner ? (
+              {!canManageRules ? (
                 <div className="notice warn">
                   <AlertTriangle size={18} aria-hidden="true" />
                   <div>
                     <strong>Read-only session</strong>
-                    <span>OWNER permission is required to change ItemCode reward rules.</span>
+                    <span>OWNER/Admin permission is required to change ItemCode reward rules.</span>
                   </div>
                 </div>
               ) : null}
@@ -288,7 +288,7 @@ function ItemCodesContent() {
               <div className="rule-mode-grid" role="group" aria-label="Reward rule type">
                 <button
                   className={`rule-mode-button ${draft.mode === "FIXED" ? "active" : ""}`}
-                  disabled={!isOwner || busy}
+                  disabled={!canManageRules || busy}
                   onClick={() => setDraft((current) => ({ ...current, mode: "FIXED", percentOfPricePoints: "" }))}
                   type="button"
                 >
@@ -297,7 +297,7 @@ function ItemCodesContent() {
                 </button>
                 <button
                   className={`rule-mode-button ${draft.mode === "PERCENT_OF_PRICE" ? "active" : ""}`}
-                  disabled={!isOwner || busy}
+                  disabled={!canManageRules || busy}
                   onClick={() => setDraft((current) => ({ ...current, mode: "PERCENT_OF_PRICE", fixedPoints: "" }))}
                   type="button"
                 >
@@ -311,7 +311,7 @@ function ItemCodesContent() {
                   <span className="field-label">Absolute Points</span>
                   <input
                     className="text-input"
-                    disabled={!isOwner || draft.mode !== "FIXED" || busy}
+                    disabled={!canManageRules || draft.mode !== "FIXED" || busy}
                     inputMode="numeric"
                     min="1"
                     onChange={(event) => setDraft((current) => ({ ...current, fixedPoints: event.target.value }))}
@@ -323,7 +323,7 @@ function ItemCodesContent() {
                   <span className="field-label">% of Price</span>
                   <input
                     className="text-input"
-                    disabled={!isOwner || draft.mode !== "PERCENT_OF_PRICE" || busy}
+                    disabled={!canManageRules || draft.mode !== "PERCENT_OF_PRICE" || busy}
                     inputMode="decimal"
                     min="0.01"
                     onChange={(event) => setDraft((current) => ({ ...current, percentOfPricePoints: event.target.value }))}
@@ -341,7 +341,7 @@ function ItemCodesContent() {
 
               <div className="actions item-code-editor-actions">
                 <span className={`status ${draftError ? "error" : ""}`}>{draftError ?? selectedItem.ruleSummary}</span>
-                <button className="button primary" type="button" disabled={!isOwner || busy || Boolean(draftError)} onClick={() => void saveRule()}>
+                <button className="button primary" type="button" disabled={!canManageRules || busy || Boolean(draftError)} onClick={() => void saveRule()}>
                   <Save size={16} aria-hidden="true" />
                   Save rule
                 </button>

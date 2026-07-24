@@ -22,6 +22,7 @@ export const ACTOR_ROLE = {
   CONTRACTOR: "CONTRACTOR",
   TEAM_MEMBER: "TEAM_MEMBER",
   OWNER: "OWNER",
+  ADMIN: "ADMIN",
   STAFF: "STAFF",
   SYSTEM: "SYSTEM",
 } as const;

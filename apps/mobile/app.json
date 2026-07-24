@@ -6,28 +6,71 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F7F7"
+    },
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "1",
       "bundleIdentifier": "com.insig8.voltrewards",
       "infoPlist": {
         "NSCameraUsageDescription": "Volt Rewards uses the camera to scan product QR codes when you choose Scan QR.",
-        "NSContactsUsageDescription": "Volt Rewards can help select a contractor mobile number from contacts if you allow it."
+        "NSContactsUsageDescription": "Volt Rewards can help select a contractor mobile number from contacts if you allow it.",
+        "NSPhotoLibraryUsageDescription": "Volt Rewards uses your photo library only when you choose a profile photo.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.insig8.voltrewards",
-      "permissions": [],
+      "versionCode": 1,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-foreground.png",
         "backgroundColor": "#0757D7"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro"
     },
-    "plugins": ["expo-secure-store"],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Volt Rewards uses the camera to scan product QR codes when you choose Scan QR.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Volt Rewards uses your photo library only when you choose a profile photo.",
+          "microphonePermission": false
+        }
+      ],
+      "@react-native-vector-icons/feather"
+    ],
     "extra": {
-      "apiBaseUrl": "http://127.0.0.1:3000/api"
-    }
+      "apiBaseUrl": "http://127.0.0.1:3000/api",
+      "eas": {
+        "projectId": "0c9e47ae-d39e-4e16-ab9d-cf657be5c9f6"
+      }
+    },
+    "owner": "nplusone-apps"
   }
 }

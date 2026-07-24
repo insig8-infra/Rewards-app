@@ -74,7 +74,7 @@ function ReportsContent() {
   const [pageSize, setPageSize] = useState(25);
   const [status, setStatus] = useState<StatusState>({ tone: "idle", message: "Loading reports" });
   const [loading, setLoading] = useState<"landing" | "report" | "export" | null>(null);
-  const isOwner = actorRole === "OWNER";
+  const canExport = actorRole === "OWNER" || actorRole === "ADMIN";
 
   useEffect(() => {
     void loadLanding();
@@ -137,8 +137,8 @@ function ReportsContent() {
   }
 
   async function exportReport(format: AdminReportExportFormat): Promise<void> {
-    if (!isOwner) {
-      setStatus({ tone: "error", message: "Only OWNER can export reports." });
+    if (!canExport) {
+      setStatus({ tone: "error", message: "Only OWNER/Admin can export reports." });
       return;
     }
     setLoading("export");
@@ -232,11 +232,11 @@ function ReportsContent() {
             {loading === "report" ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
             Refresh
           </button>
-          <button className="button" type="button" disabled={!isOwner || loading !== null} onClick={() => void exportReport("PDF")}>
+          <button className="button" type="button" disabled={!canExport || loading !== null} onClick={() => void exportReport("PDF")}>
             <FileText size={16} aria-hidden="true" />
             PDF
           </button>
-          <button className="button primary" type="button" disabled={!isOwner || loading !== null} onClick={() => void exportReport("EXCEL")}>
+          <button className="button primary" type="button" disabled={!canExport || loading !== null} onClick={() => void exportReport("EXCEL")}>
             <FileSpreadsheet size={16} aria-hidden="true" />
             Excel
           </button>
@@ -270,10 +270,10 @@ function ReportsContent() {
                 <div className="report-chart-bars">
                   {chart.segments.length === 0 ? (
                     <div className="status">No activity yet.</div>
-                  ) : chart.segments.map((segment) => {
+                  ) : chart.segments.map((segment, segmentIndex) => {
                     const width = total > 0 ? Math.round((segment.value / denominator) * 100) : 0;
                     return (
-                      <div className="report-chart-row" key={`${chart.key}-${segment.label}`}>
+                      <div className="report-chart-row" key={`${chart.key}-${segment.label}-${segmentIndex}`}>
                         <div className="report-chart-row-label">
                           <span>{segment.label}</span>
                           <strong>{formatCell(segment.value)}</strong>
@@ -292,7 +292,7 @@ function ReportsContent() {
         </div>
       ) : null}
 
-      {!isOwner ? (
+      {!canExport ? (
         <div className="notice warn">
           <Download size={17} aria-hidden="true" />
           <div>

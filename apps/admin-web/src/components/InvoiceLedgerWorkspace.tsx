@@ -98,7 +98,7 @@ function InvoiceLedgerContent() {
             <input
               aria-label="Search invoice ledger"
               className="text-input"
-              placeholder="Search invoice, customer, GSTIN, product"
+              placeholder="Search invoice, party, item, code"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -248,8 +248,8 @@ function filterInvoices(
     }
     return [
       invoice.invoiceNumber,
+      invoice.externalInvoiceId,
       invoice.customerName,
-      invoice.customerGstin ?? "",
       invoice.productSummary,
       invoice.categorySummary,
       invoice.status,

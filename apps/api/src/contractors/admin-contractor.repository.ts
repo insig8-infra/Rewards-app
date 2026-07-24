@@ -1,4 +1,5 @@
 import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
+import type { AdminContractorScannedItemAnalytics } from "./admin-contractor-analytics.js";
 
 export const ADMIN_CONTRACTOR_REPOSITORY = Symbol("ADMIN_CONTRACTOR_REPOSITORY");
 
@@ -16,7 +17,11 @@ export interface AdminContractorSummary {
   readonly availablePoints: number;
   readonly siteCount: number;
   readonly scanCount: number;
+  readonly successfulScanCount: number;
+  readonly scannedBusinessInr: string;
   readonly rewardClaimCount: number;
+  readonly fulfilledRewardCount: number;
+  readonly fulfilledRewardValueInr: number;
   readonly siteSummary: string;
   readonly citySummary: string;
   readonly createdAt: Date;
@@ -32,9 +37,12 @@ export interface AdminContractorSite {
   readonly city?: string;
   readonly status: "ACTIVE" | "ARCHIVED";
   readonly scanCount: number;
+  readonly successfulScanCount: number;
   readonly qrValuePoints: number;
   readonly creditedPoints: number;
+  readonly scannedBusinessInr: string;
   readonly productSummary: string;
+  readonly scannedItems: readonly AdminContractorScannedItemAnalytics[];
 }
 
 export interface AdminContractorDetail extends AdminContractorSummary {

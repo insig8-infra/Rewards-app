@@ -29,7 +29,7 @@ import { AdminPortalShell, useAdminActor } from "./AdminPortalShell";
 import { Avatar, ProfilePhotoUpload } from "./ProfilePhotoUpload";
 
 type ContractorFilter = "all" | "active" | "deactivated" | "has-rewards" | "has-scans" | "silver" | "gold" | "platinum" | "diamond";
-type ContractorSort = "newest" | "name" | "available-points" | "total-points" | "scan-count";
+type ContractorSort = "newest" | "name" | "business-inr" | "total-points" | "scan-count" | "reward-value";
 
 interface ContractorFormState {
   readonly name: string;
@@ -84,7 +84,7 @@ function ContractorDirectory() {
   const [status, setStatus] = useState<StatusState>({ tone: "idle", message: "Loading contractors" });
   const [loading, setLoading] = useState(false);
   const api = useMemo(() => createAdminApiClient(), []);
-  const canMutate = actorRole === "OWNER";
+  const canMutate = actorRole === "OWNER" || actorRole === "ADMIN";
 
   useEffect(() => {
     let cancelled = false;
@@ -122,7 +122,10 @@ function ContractorDirectory() {
     [contractors, filter, query, sort],
   );
   const activeCount = contractors.filter((contractor) => contractor.status === "ACTIVE").length;
-  const totalAvailablePoints = contractors.reduce((total, contractor) => total + contractor.availablePoints, 0);
+  const totalCollectedPoints = contractors.reduce((total, contractor) => total + contractor.totalAccumulatedPoints, 0);
+  const totalScannedBusinessInr = contractors.reduce((total, contractor) => total + Number(contractor.scannedBusinessInr), 0);
+  const totalFulfilledRewards = contractors.reduce((total, contractor) => total + contractor.fulfilledRewardCount, 0);
+  const totalFulfilledRewardValueInr = contractors.reduce((total, contractor) => total + contractor.fulfilledRewardValueInr, 0);
 
   async function refreshContractors() {
     setLoading(true);
@@ -148,7 +151,7 @@ function ContractorDirectory() {
         <div className="toolbar">
           <span className={`badge ${canMutate ? "good" : "warn"}`}>
             {canMutate ? <ShieldCheck size={14} aria-hidden="true" /> : <LockKeyhole size={14} aria-hidden="true" />}
-            {canMutate ? "OWNER controls" : "STAFF read only"}
+            {canMutate ? "OWNER / ADMIN controls" : "STAFF read only"}
           </span>
           {canMutate ? (
             <Link className="button primary" href={"/contractors/new" as Route}>
@@ -163,7 +166,10 @@ function ContractorDirectory() {
         <Metric label="Contractors" value={String(contractors.length)} />
         <Metric label="Active" value={String(activeCount)} />
         <Metric label="Sites" value={String(contractors.reduce((total, item) => total + item.siteCount, 0))} />
-        <Metric label="Available points" value={String(totalAvailablePoints)} />
+        <Metric label="Total points collected" value={formatMetricNumber(totalCollectedPoints)} />
+        <Metric label="Business generated" value={formatInr(totalScannedBusinessInr)} />
+        <Metric label="Rewards collected" value={String(totalFulfilledRewards)} />
+        <Metric label="Reward value" value={formatInr(totalFulfilledRewardValueInr)} />
       </div>
 
       <section className="panel" aria-label="Contractor directory">
@@ -184,7 +190,7 @@ function ContractorDirectory() {
             <Search size={16} aria-hidden="true" />
             <input
               className="text-input"
-              placeholder="Name, mobile, code, site, city"
+              placeholder="Name, mobile, code, area, site"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -208,9 +214,10 @@ function ContractorDirectory() {
             <select className="select-input" value={sort} onChange={(event) => setSort(event.target.value as ContractorSort)}>
               <option value="newest">Newest</option>
               <option value="name">Name</option>
-              <option value="available-points">Available points</option>
+              <option value="business-inr">Business generated</option>
               <option value="total-points">Total points</option>
               <option value="scan-count">Scan count</option>
+              <option value="reward-value">Reward value</option>
             </select>
           </label>
           <div className="field">
@@ -230,7 +237,7 @@ function ContractorDirectory() {
                   <div>
                     <strong>{contractor.name}</strong>
                     <span>
-                      {contractor.contractorCode} · {contractor.mobileNumber} · {contractor.citySummary}
+                      {contractor.contractorCode} · {contractor.mobileNumber} · Area: {contractor.belongsToNote || "Not recorded"}
                     </span>
                   </div>
                   <div className="chip-list compact">
@@ -239,10 +246,12 @@ function ContractorDirectory() {
                   </div>
                 </div>
                 <div className="ledger-facts">
-                  <span>Available: {contractor.availablePoints}</span>
-                  <span>Total: {contractor.totalAccumulatedPoints}</span>
+                  <span>Points: {contractor.totalAccumulatedPoints}</span>
+                  <span>Business: {formatInr(contractor.scannedBusinessInr)}</span>
+                  <span>Rewards: {contractor.fulfilledRewardCount}</span>
+                  <span>Reward INR: {formatInr(contractor.fulfilledRewardValueInr)}</span>
                   <span>Sites: {contractor.siteCount}</span>
-                  <span>Scans: {contractor.scanCount}</span>
+                  <span>Scans: {contractor.successfulScanCount}</span>
                 </div>
                 <div className="status">{contractor.siteSummary}</div>
               </Link>
@@ -306,7 +315,7 @@ function ContractorCreate() {
           </div>
           <span className="badge good">
             <UserPlus size={14} aria-hidden="true" />
-            OWNER
+            OWNER / ADMIN
           </span>
         </div>
 
@@ -325,7 +334,7 @@ function ContractorCreate() {
             onPhotoChange={(photoUrl) => setForm((current) => ({ ...current, photoUrl }))}
           />
           <label className="field wide-field">
-            <span className="field-label">Where they belong to</span>
+            <span className="field-label">Area</span>
             <textarea
               className="text-input promotion-textarea"
               maxLength={1000}
@@ -368,7 +377,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
   const [status, setStatus] = useState<StatusState>({ tone: "idle", message: "Loading contractor" });
   const [loading, setLoading] = useState<string | null>(null);
   const api = useMemo(() => createAdminApiClient(), []);
-  const canMutate = actorRole === "OWNER";
+  const canMutate = actorRole === "OWNER" || actorRole === "ADMIN";
 
   useEffect(() => {
     let cancelled = false;
@@ -551,11 +560,13 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
             <div className="detail-grid">
               <LockedFact label="Name" value={contractor.name} />
               <LockedFact label="Mobile" value={contractor.mobileNumber} />
-              <Metric label="Available points" value={String(contractor.availablePoints)} />
-              <Metric label="Total points" value={String(contractor.totalAccumulatedPoints)} />
+              <Metric label="Current balance" value={String(contractor.availablePoints)} />
+              <Metric label="Total points collected" value={String(contractor.totalAccumulatedPoints)} />
+              <Metric label="Business generated" value={formatInr(contractor.scannedBusinessInr)} />
+              <Metric label="Rewards collected" value={String(contractor.fulfilledRewardCount)} />
+              <Metric label="Reward value" value={formatInr(contractor.fulfilledRewardValueInr)} />
               <Metric label="Sites" value={String(contractor.siteCount)} />
-              <Metric label="Scans" value={String(contractor.scanCount)} />
-              <Metric label="Reward claims" value={String(contractor.rewardClaimCount)} />
+              <Metric label="Successful scans" value={String(contractor.successfulScanCount)} />
               <Metric label="Tier" value={contractor.tier ?? "Silver"} />
             </div>
             <div className="detail-action-copy">
@@ -563,7 +574,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
               <span>If either identity field is wrong, deactivate this contractor and create a new record.</span>
             </div>
             <div className="detail-action-copy">
-              <strong>Where they belong to</strong>
+              <strong>Area</strong>
               <span>{contractor.belongsToNote || "Not recorded"}</span>
             </div>
           </section>
@@ -575,7 +586,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                   <h2 className="panel-title">Profile photo</h2>
                   <div className="panel-subtitle">Device upload preview</div>
                 </div>
-                <span className={`badge ${canMutate ? "good" : "warn"}`}>{canMutate ? "OWNER" : "Read only"}</span>
+                <span className={`badge ${canMutate ? "good" : "warn"}`}>{canMutate ? "OWNER / ADMIN" : "Read only"}</span>
               </div>
               {canMutate ? (
                 <>
@@ -589,7 +600,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                     />
                   </div>
                   <div className="actions">
-                    <span className="status">Stored in `photoUrl` until production media storage is selected</span>
+                    <span className="status">Use a clear face photo so store teams can identify the contractor confidently.</span>
                     <button className="button primary" type="button" onClick={() => void savePhoto()} disabled={loading !== null}>
                       {loading === "photo" ? <Loader2 size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
                       Save photo
@@ -597,22 +608,22 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                   </div>
                 </>
               ) : (
-                <div className="panel-empty compact">Photo update is OWNER-only</div>
+                <div className="panel-empty compact">Photo update is available to OWNER/Admin sessions</div>
               )}
             </section>
 
             <section className="panel" aria-label="Contractor association">
               <div className="panel-header">
                 <div>
-                  <h2 className="panel-title">Contractor association</h2>
+                  <h2 className="panel-title">Area</h2>
                   <div className="panel-subtitle">Retailer context visible to admins</div>
                 </div>
-                <span className={`badge ${canMutate ? "good" : "warn"}`}>{canMutate ? "OWNER" : "Read only"}</span>
+                <span className={`badge ${canMutate ? "good" : "warn"}`}>{canMutate ? "OWNER / ADMIN" : "Read only"}</span>
               </div>
               {canMutate ? (
                 <>
                   <label className="field">
-                    <span className="field-label">Where they belong to</span>
+                    <span className="field-label">Area</span>
                     <textarea
                       className="text-input promotion-textarea"
                       maxLength={1000}
@@ -621,7 +632,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                     />
                   </label>
                   <div className="actions">
-                    <span className="status">Use this for branch, site cluster, group, or relationship context.</span>
+                    <span className="status">Use this for branch, market, site cluster, or relationship context.</span>
                     <button className="button primary" type="button" onClick={() => void saveAssociationNote()} disabled={loading !== null}>
                       {loading === "association" ? <Loader2 size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
                       Save association
@@ -664,7 +675,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                     ) : null}
                   </div>
                   <div className="actions danger-zone">
-                    <span className="status">Deactivate wrong or inactive profiles instead of editing identity fields.</span>
+                    <span className="status">Deactivate an account when the contractor should no longer use the program.</span>
                     {contractor.status === "ACTIVE" ? (
                       <button className="button danger" type="button" onClick={() => void deactivateContractor()} disabled={loading !== null}>
                         {loading === "deactivate" ? <Loader2 size={16} aria-hidden="true" /> : <UserX size={16} aria-hidden="true" />}
@@ -679,7 +690,7 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                   </div>
                 </>
               ) : (
-                <div className="panel-empty compact">STAFF can inspect contractor records but cannot mutate them</div>
+                <div className="panel-empty compact">STAFF can inspect contractor records but cannot change them</div>
               )}
             </section>
           </div>
@@ -710,22 +721,54 @@ function ContractorDetail({ contractorId }: { readonly contractorId: string }) {
                         <span className={`badge ${site.status === "ACTIVE" ? "good" : "warn"}`}>{site.status}</span>
                       </div>
                       <div className="ledger-facts">
-                        <span>Scans: {site.scanCount}</span>
-                        <span>Credited: {formatMetricNumber(site.creditedPoints)}</span>
-                        <span>QR value: {formatMetricNumber(site.qrValuePoints)}</span>
+                        <span>Successful scans: {site.successfulScanCount}</span>
+                        <span>Points: {formatMetricNumber(site.creditedPoints)}</span>
+                        <span>Business: {formatInr(site.scannedBusinessInr)}</span>
                         <button className="button compact" type="button" onClick={() => setExpandedSiteId(expandedSiteId === site.siteId ? null : site.siteId)}>
                           {expandedSiteId === site.siteId ? "Hide analytics" : "View analytics"}
                         </button>
                       </div>
                     </div>
                     {expandedSiteId === site.siteId ? (
-                      <div className="detail-grid">
-                        <Metric label="Scan attempts" value={String(site.scanCount)} />
-                        <Metric label="QR value points" value={formatMetricNumber(site.qrValuePoints)} />
-                        <Metric label="Credited points" value={formatMetricNumber(site.creditedPoints)} />
-                        <Metric label="Items scanned" value={formatMetricText(site.productSummary, "No successful item scans")} />
-                        <Metric label="City" value={site.city ?? "Not set"} />
-                        <Metric label="Area" value={site.area ?? "Not set"} />
+                      <div className="site-analytics-block">
+                        <div className="detail-grid">
+                          <Metric label="Total scan attempts" value={String(site.scanCount)} />
+                          <Metric label="Successful scans" value={String(site.successfulScanCount)} />
+                          <Metric label="Points collected" value={formatMetricNumber(site.creditedPoints)} />
+                          <Metric label="Business generated" value={formatInr(site.scannedBusinessInr)} />
+                        </div>
+                        {site.scannedItems.length === 0 ? (
+                          <div className="panel-empty compact">No successful item scans for this site yet</div>
+                        ) : (
+                          <div className="data-table-wrap">
+                            <table className="data-table site-analytics-table">
+                              <thead>
+                                <tr>
+                                  <th scope="col">Item</th>
+                                  <th scope="col">ItemCode</th>
+                                  <th scope="col">Qty</th>
+                                  <th scope="col">Price</th>
+                                  <th scope="col">Amount</th>
+                                  <th scope="col">Points</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {site.scannedItems.map((item) => (
+                                  <tr key={`${item.sku}-${item.productName}-${item.unitPriceInr}`}>
+                                    <td className="data-table-primary">
+                                      <strong>{item.productName}</strong>
+                                    </td>
+                                    <td>{item.sku}</td>
+                                    <td className="number-cell">{item.quantity}</td>
+                                    <td className="amount-cell">INR {item.unitPriceInr}</td>
+                                    <td className="amount-cell">INR {item.totalAmountInr}</td>
+                                    <td className="number-cell">{item.pointsCollected}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -753,6 +796,7 @@ function applyContractorListTools(
         contractor.name,
         contractor.mobileNumber,
         contractor.contractorCode,
+        contractor.belongsToNote,
         contractor.tier,
         contractor.siteSummary,
         contractor.citySummary,
@@ -787,12 +831,14 @@ function applyContractorListTools(
     switch (sort) {
       case "name":
         return left.name.localeCompare(right.name);
-      case "available-points":
-        return right.availablePoints - left.availablePoints;
+      case "business-inr":
+        return Number(right.scannedBusinessInr) - Number(left.scannedBusinessInr);
       case "total-points":
         return right.totalAccumulatedPoints - left.totalAccumulatedPoints;
       case "scan-count":
-        return right.scanCount - left.scanCount;
+        return right.successfulScanCount - left.successfulScanCount;
+      case "reward-value":
+        return right.fulfilledRewardValueInr - left.fulfilledRewardValueInr;
       default:
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     }
@@ -849,9 +895,12 @@ function formatMetricNumber(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "0";
 }
 
-function formatMetricText(value: string | null | undefined, fallback: string): string {
-  const normalized = value?.trim();
-  return normalized || fallback;
+function formatInr(value: string | number | null | undefined): string {
+  const numericValue = typeof value === "string" ? Number(value) : value;
+  if (typeof numericValue !== "number" || !Number.isFinite(numericValue)) {
+    return "INR 0.00";
+  }
+  return `INR ${numericValue.toFixed(2)}`;
 }
 
 interface StatusState {

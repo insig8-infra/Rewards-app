@@ -8,7 +8,7 @@ export default async function StaffDetailPage({
 }) {
   const [{ staffId }, session] = await Promise.all([
     params,
-    requireAdminSession({ allowedRoles: ["OWNER"], loginRedirectTo: "/staff" }),
+    requireAdminSession({ allowedRoles: ["OWNER", "ADMIN"], loginRedirectTo: "/staff" }),
   ]);
 
   return <AdminStaffDetailWorkspace session={session} staffId={staffId} />;

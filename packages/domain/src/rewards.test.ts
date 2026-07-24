@@ -60,7 +60,7 @@ test("cancelChosenReward restores points before physical collection", () => {
   assert.equal(cancelled.ledgerEntry.type, "reward_cancel_restore");
 });
 
-test("fulfillReward is OWNER-only and requires OTP", () => {
+test("fulfillReward allows OWNER/Admin and requires OTP", () => {
   const redeemed = redeemReward(contractor, reward, {
     claimId: "CLAIM-004",
     rewardClaimId: "claim_4",
@@ -77,6 +77,13 @@ test("fulfillReward is OWNER-only and requires OTP", () => {
   });
 
   assert.equal(fulfilled.status, REWARD_CLAIM_STATUS.FULFILLED);
+  assert.equal(
+    fulfillReward(redeemed.claim, {
+      actorRole: ACTOR_ROLE.ADMIN,
+      otpVerified: true,
+    }).status,
+    REWARD_CLAIM_STATUS.FULFILLED,
+  );
 });
 
 test("revokeUnfulfilledRewardDueToReturn restores deducted reward points", () => {

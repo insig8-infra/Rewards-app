@@ -6,6 +6,7 @@ import { ACTOR_ROLE, type ActorRole } from "@volt-rewards/domain";
 import type { AuthenticatedActor } from "./authenticated-actor.js";
 import {
   type AdminAuthProfile,
+  type AdminAuthRole,
   type AuthSessionRecord,
   type ContractorAuthProfile,
   type CreateSessionInput,
@@ -14,7 +15,7 @@ import {
 } from "./mobile-auth.repository.js";
 import { hashToken, MobileAuthService } from "./mobile-auth.service.js";
 
-test("MobileAuthService authenticates OWNER and STAFF admin PIN sessions", async () => {
+test("MobileAuthService authenticates OWNER, ADMIN, and STAFF admin PIN sessions", async () => {
   const repository = new InMemoryMobileAuthRepository();
   const service = new DeterministicMobileAuthService(repository);
   const now = new Date("2026-07-06T08:00:00.000Z");
@@ -37,6 +38,15 @@ test("MobileAuthService authenticates OWNER and STAFF admin PIN sessions", async
   assert.equal(staff.admin.name, "Aarti Deshmukh");
   assert.equal(staff.admin.staffId, "staff_1");
   assert.equal(staff.session.actor.role, ACTOR_ROLE.STAFF);
+
+  const admin = await service.loginAdmin(
+    { role: ACTOR_ROLE.ADMIN, mobileNumber: "9000000093", pin: "3333" },
+    now,
+  );
+  assert.equal(admin.status, "AUTHENTICATED");
+  assert.equal(admin.admin.name, "Rohit Iyer");
+  assert.equal(admin.admin.staffId, "admin_1");
+  assert.equal(admin.session.actor.role, ACTOR_ROLE.ADMIN);
 });
 
 test("MobileAuthService rejects invalid or inactive admin login", async () => {
@@ -48,7 +58,7 @@ test("MobileAuthService rejects invalid or inactive admin login", async () => {
     (error) => error instanceof UnauthorizedException,
   );
   await assert.rejects(
-    service.loginAdmin({ role: ACTOR_ROLE.STAFF, mobileNumber: "9000000093", pin: "3333" }),
+    service.loginAdmin({ role: ACTOR_ROLE.STAFF, mobileNumber: "9000000094", pin: "4444" }),
     (error) => error instanceof UnauthorizedException,
   );
 });
@@ -245,14 +255,23 @@ class InMemoryMobileAuthRepository implements MobileAuthRepository {
       status: "ACTIVE",
       pinHash: adminPinHash("2222"),
     });
-    this.admins.set("STAFF:9000000093", {
+    this.admins.set("ADMIN:9000000093", {
+      userId: "dev-admin-user",
+      role: ACTOR_ROLE.ADMIN,
+      staffId: "admin_1",
+      name: "Rohit Iyer",
+      mobileNumber: "9000000093",
+      status: "ACTIVE",
+      pinHash: adminPinHash("3333"),
+    });
+    this.admins.set("STAFF:9000000094", {
       userId: "inactive-staff-user",
       role: ACTOR_ROLE.STAFF,
       staffId: "staff_inactive",
       name: "Nitin Jadhav",
-      mobileNumber: "9000000093",
+      mobileNumber: "9000000094",
       status: "DEACTIVATED",
-      pinHash: adminPinHash("3333"),
+      pinHash: adminPinHash("4444"),
     });
     this.contractors.set(
       "contractor_1",
@@ -269,7 +288,7 @@ class InMemoryMobileAuthRepository implements MobileAuthRepository {
     );
   }
 
-  async findAdminByMobileAndRole(mobileNumber: string, role: "OWNER" | "STAFF"): Promise<AdminAuthProfile | null> {
+  async findAdminByMobileAndRole(mobileNumber: string, role: AdminAuthRole): Promise<AdminAuthProfile | null> {
     return this.admins.get(`${role}:${mobileNumber}`) ?? null;
   }
 

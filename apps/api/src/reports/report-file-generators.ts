@@ -66,6 +66,15 @@ export function createReportXlsx(report: AdminReportResponse): Buffer {
   return createZip(files);
 }
 
+export function createReportCsv(report: AdminReportResponse): Buffer {
+  const rows = [
+    report.columns.map((column) => column.label),
+    ...report.rows.map((row) => report.columns.map((column) => row[column.key] ?? "")),
+  ];
+
+  return Buffer.from(`${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`, "utf8");
+}
+
 function buildPdfTextContent(lines: readonly string[]): string {
   const output = ["BT", "/F1 8 Tf", "36 552 Td", "10 TL"];
   for (const [index, line] of lines.slice(0, 48).entries()) {
@@ -173,6 +182,14 @@ function escapeXml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+function csvCell(value: string | number | boolean): string {
+  const text = String(value);
+  if (!/[",\n\r]/.test(text)) {
+    return text;
+  }
+  return `"${text.replace(/"/g, "\"\"")}"`;
 }
 
 function xmlBuffer(value: string): Buffer {

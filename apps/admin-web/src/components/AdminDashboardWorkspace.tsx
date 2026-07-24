@@ -5,19 +5,10 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
-  ClipboardList,
-  FileText,
-  Gift,
   Loader2,
-  Megaphone,
-  Printer,
   RefreshCw,
   ShieldAlert,
-  Tags,
   TrendingUp,
-  UserCog,
-  Users,
-  type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
@@ -26,7 +17,6 @@ import {
   createAdminApiClient,
   type AdminDashboard,
   type AdminDashboardAttentionItem,
-  type AdminDashboardShortcut,
 } from "../api/adminApi";
 import type { AdminSessionView } from "../auth/adminSessionTypes";
 import { AdminPortalShell } from "./AdminPortalShell";
@@ -126,7 +116,6 @@ function AdminDashboardContent({
   const role = dashboard?.actorRole ?? session.role;
   const summaryCards = buildSummaryCards(metrics, role);
   const attentionItems = dashboard?.attentionQueue ?? [];
-  const shortcuts = dashboard?.shortcuts ?? [];
   const statusMix = dashboard?.qrStatusMix ?? [];
   const trend = dashboard?.printTrend ?? [];
   const maxStatusCount = Math.max(1, ...statusMix.map((item) => item.count));
@@ -186,21 +175,6 @@ function AdminDashboardContent({
             ) : (
               <div className="panel-empty compact">No urgent dashboard work</div>
             )}
-          </div>
-        </section>
-
-        <section className="panel" aria-label="Shortcuts">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title">Shortcuts</h2>
-              <div className="panel-subtitle">Role-aware actions</div>
-            </div>
-            <span className="badge good">{role}</span>
-          </div>
-          <div className="shortcut-grid">
-            {shortcuts.map((shortcut) => (
-              <ShortcutCard key={shortcut.href} shortcut={shortcut} />
-            ))}
           </div>
         </section>
 
@@ -372,47 +346,6 @@ function AttentionRow({ item }: { readonly item: AdminDashboardAttentionItem }) 
   return <div className="attention-row">{row}</div>;
 }
 
-function ShortcutCard({ shortcut }: { readonly shortcut: AdminDashboardShortcut }) {
-  const Icon = getShortcutIcon(shortcut.icon);
-
-  return (
-    <Link className="shortcut-card" href={shortcut.href as Route}>
-      <span className="shortcut-icon">
-        <Icon size={17} aria-hidden="true" />
-      </span>
-      <div>
-        <strong>{shortcut.label}</strong>
-        <span>{shortcut.description}</span>
-      </div>
-    </Link>
-  );
-}
-
-function getShortcutIcon(icon: string): LucideIcon {
-  switch (icon) {
-    case "gift":
-      return Gift;
-    case "history":
-      return ClipboardList;
-    case "megaphone":
-      return Megaphone;
-    case "printer":
-      return Printer;
-    case "receipt":
-      return FileText;
-    case "report":
-      return BarChart3;
-    case "staff":
-      return UserCog;
-    case "tag":
-      return Tags;
-    case "users":
-      return Users;
-    default:
-      return Activity;
-  }
-}
-
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Request failed";
 }
@@ -433,7 +366,7 @@ function formatDateTime(value: string): string {
 }
 
 function buildSummaryCards(metrics: AdminDashboard["metrics"], role: string) {
-  const owner = role === "OWNER";
+  const manager = role === "OWNER" || role === "ADMIN";
 
   return [
     {
@@ -445,8 +378,8 @@ function buildSummaryCards(metrics: AdminDashboard["metrics"], role: string) {
     {
       label: "Staff",
       value: metrics.staff,
-      meta: owner ? "Manage team" : "Owner managed",
-      href: owner ? "/staff" : undefined,
+      meta: manager ? "Manage team" : "Owner/Admin managed",
+      href: manager ? "/staff" : undefined,
     },
     {
       label: "Ready to print",
@@ -482,7 +415,7 @@ function buildSummaryCards(metrics: AdminDashboard["metrics"], role: string) {
       label: "Pending rewards",
       value: metrics.pendingRewardClaims,
       meta: `${metrics.rewardClaims} total claims`,
-      href: owner ? "/rewards" : undefined,
+      href: manager ? "/rewards" : undefined,
     },
   ];
 }

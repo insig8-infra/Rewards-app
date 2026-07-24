@@ -5,6 +5,7 @@ import {
   DomainError,
   resolveItemCodeStatus,
   allocateBusyReturnLine,
+  type ActorRole,
   type BusyReturnAllocationType,
 } from "@volt-rewards/domain";
 import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
@@ -402,7 +403,7 @@ export class PrismaBusyImportRepository implements BusyImportRepository {
 }
 
 export function resolveBusyInvoiceImportAuditContext(actor?: AuthenticatedActor): {
-  readonly actorRole: "OWNER" | "STAFF" | "CONTRACTOR" | "TEAM_MEMBER" | "SYSTEM";
+  readonly actorRole: ActorRole;
   readonly surface: "ADMIN_WEB" | "BACKEND_JOB";
   readonly action: typeof BUSY_MOCK_IMPORT_ACTION | typeof BUSY_INTEGRATION_IMPORT_ACTION;
 } {

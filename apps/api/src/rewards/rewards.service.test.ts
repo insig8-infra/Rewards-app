@@ -41,6 +41,34 @@ test("RewardsService system-populates reward code for normal catalog creation", 
   assert.deepEqual(fake.state.audits.map((audit) => audit.action), ["REWARD_CATALOG_CREATED", "REWARD_CATALOG_CREATED"]);
 });
 
+test("RewardsService listAdminClaims returns only active fulfillment claims", async () => {
+  const claims = [
+    buildAdminClaim({ claimId: "CLM-ACTIVE01", status: "CHOSEN" }),
+    buildAdminClaim({ claimId: "CLM-STALE01", status: "CHOSEN" }),
+    buildAdminClaim({ claimId: "CLM-CANCELLED01", status: "CANCELLED_BY_CONTRACTOR" }),
+  ];
+  const prisma = {
+    rewardClaim: {
+      findMany: async (args: {
+        readonly where: { readonly status: string; readonly claimId: { readonly not: string } };
+      }) => {
+        assert.deepEqual(args.where, {
+          status: "CHOSEN",
+          claimId: { not: "CLM-STALE01" },
+        });
+        return claims.filter((claim) => claim.status === args.where.status && claim.claimId !== args.where.claimId.not);
+      },
+    },
+  };
+  const service = new RewardsService(prisma as never);
+
+  const result = await service.listAdminClaims({ role: ACTOR_ROLE.OWNER, userId: "owner_user_1" });
+
+  assert.deepEqual(result.map((entry) => entry.claim.claimId), ["CLM-ACTIVE01"]);
+  assert.equal(result[0]?.canSendOtp, true);
+  assert.equal(result[0]?.canFulfill, true);
+});
+
 function createRewardCatalogFakePrisma() {
   const state = {
     items: [] as FakeRewardCatalogItem[],
@@ -98,3 +126,29 @@ type FakeRewardCatalogItem = {
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };
+
+function buildAdminClaim(input: { readonly claimId: string; readonly status: string }) {
+  return {
+    id: `reward_claim_${input.claimId.toLowerCase()}`,
+    claimId: input.claimId,
+    contractorId: "contractor_1",
+    rewardItemId: "reward_1",
+    rewardItem: { name: "Premium Toolbox" },
+    status: input.status,
+    pointsDeducted: 500,
+    chosenAt: new Date("2026-07-07T09:00:00.000Z"),
+    cancelledAt: input.status === "CANCELLED_BY_CONTRACTOR" ? new Date("2026-07-07T09:08:00.000Z") : null,
+    fulfilledAt: null,
+    otpVerifiedAt: null,
+    contractor: {
+      id: "contractor_1",
+      code: "CON-0001",
+      totalAccumulatedPoints: 2600,
+      availablePoints: 2100,
+      user: {
+        displayName: "Mahesh Patil",
+        mobileNumber: "9000001002",
+      },
+    },
+  };
+}

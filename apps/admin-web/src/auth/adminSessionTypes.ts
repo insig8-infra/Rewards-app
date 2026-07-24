@@ -1,7 +1,9 @@
-export type AdminRole = "OWNER" | "STAFF";
+export type AdminRole = "OWNER" | "ADMIN" | "STAFF";
 
 export interface AdminSessionView {
   readonly role: AdminRole;
+  readonly actorName?: string;
+  readonly actorLabel: string;
   readonly roleLabel: string;
   readonly allowedSections: readonly string[];
 }

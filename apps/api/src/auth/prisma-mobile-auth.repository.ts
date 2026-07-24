@@ -10,6 +10,7 @@ import type {
   CreateSessionInput,
   MobileAuthRepository,
   OtpChallengeRecord,
+  AdminAuthRole,
 } from "./mobile-auth.repository.js";
 
 type ContractorWithUser = Contractor & {
@@ -24,7 +25,7 @@ type StaffUserWithProfile = User & {
 export class PrismaMobileAuthRepository implements MobileAuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAdminByMobileAndRole(mobileNumber: string, role: "OWNER" | "STAFF"): Promise<AdminAuthProfile | null> {
+  async findAdminByMobileAndRole(mobileNumber: string, role: AdminAuthRole): Promise<AdminAuthProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { mobileNumber },
       include: {
@@ -284,12 +285,12 @@ export class PrismaMobileAuthRepository implements MobileAuthRepository {
 }
 
 function mapAdmin(user: StaffUserWithProfile): AdminAuthProfile {
-  const staffPinHash = user.role === "STAFF" ? user.staffProfile?.pinHash : undefined;
+  const staffPinHash = user.role === "STAFF" || user.role === "ADMIN" ? user.staffProfile?.pinHash : undefined;
   const pinHash = staffPinHash ?? user.pinHash ?? undefined;
 
   return {
     userId: user.id,
-    role: user.role as "OWNER" | "STAFF",
+    role: user.role as AdminAuthRole,
     name: user.displayName,
     mobileNumber: user.mobileNumber,
     status: user.status,

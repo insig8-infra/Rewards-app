@@ -29,6 +29,7 @@ export type AdminSectionId =
   | "invoices"
   | "print-history"
   | "contractors"
+  | "admins"
   | "staff"
   | "profile"
   | "rewards"
@@ -58,17 +59,18 @@ interface AdminPortalShellProps {
 }
 
 const navItems: readonly AdminNavItem[] = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["OWNER", "STAFF"] },
-  { id: "qr-print", label: "Print QR codes", href: "/", icon: Printer, roles: ["OWNER", "STAFF"] },
-  { id: "invoices", label: "Invoice ledger", href: "/invoices", icon: ReceiptText, roles: ["OWNER", "STAFF"] },
-  { id: "print-history", label: "Print history", href: "/print-history", icon: ClipboardList, roles: ["OWNER", "STAFF"] },
-  { id: "contractors", label: "Contractors", href: "/contractors", icon: Users, roles: ["OWNER", "STAFF"] },
-  { id: "staff", label: "Staff", href: "/staff", icon: UserCog, roles: ["OWNER"] },
-  { id: "profile", label: "My profile", href: "/profile", icon: UserCircle, roles: ["STAFF"] },
-  { id: "rewards", label: "Rewards", href: "/rewards", icon: Gift, roles: ["OWNER", "STAFF"] },
-  { id: "reports", label: "Reports", href: "/reports", icon: FileDown, roles: ["OWNER", "STAFF"] },
-  { id: "promotions", label: "Promotions", href: "/promotions", icon: Megaphone, roles: ["OWNER"] },
-  { id: "item-codes", label: "ItemCodes", href: "/item-codes", icon: Tags, roles: ["OWNER", "STAFF"] },
+  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "qr-print", label: "Print QR codes", href: "/", icon: Printer, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "invoices", label: "Invoice ledger", href: "/invoices", icon: ReceiptText, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "print-history", label: "Print history", href: "/print-history", icon: ClipboardList, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "contractors", label: "Contractors", href: "/contractors", icon: Users, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "admins", label: "Admins", href: "/admins", icon: ShieldCheck, roles: ["OWNER"] },
+  { id: "staff", label: "Staff", href: "/staff", icon: UserCog, roles: ["OWNER", "ADMIN"] },
+  { id: "profile", label: "My profile", href: "/profile", icon: UserCircle, roles: ["ADMIN", "STAFF"] },
+  { id: "rewards", label: "Rewards", href: "/rewards", icon: Gift, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "reports", label: "Reports", href: "/reports", icon: FileDown, roles: ["OWNER", "ADMIN", "STAFF"] },
+  { id: "promotions", label: "Promotions", href: "/promotions", icon: Megaphone, roles: ["OWNER", "ADMIN"] },
+  { id: "item-codes", label: "ItemCodes", href: "/item-codes", icon: Tags, roles: ["OWNER", "ADMIN", "STAFF"] },
 ];
 
 const AdminActorContext = createContext<AdminActorContextValue | null>(null);
@@ -110,12 +112,14 @@ export function AdminPortalShell({ title, subtitle, activeSection, session, chil
           <header className="topbar">
             <div>
               <h1>{title}</h1>
-              <div className="status">{subtitle}</div>
+              <div className="status">
+                Welcome, {session.actorName ?? session.roleLabel} | {subtitle}
+              </div>
             </div>
             <div className="toolbar">
               <span className="badge good">
                 <ShieldCheck size={14} aria-hidden="true" />
-                {session.roleLabel}
+                {session.actorLabel}
               </span>
               <button className="button compact" type="button" disabled={loggingOut} onClick={() => void logout()}>
                 <LogOut size={15} aria-hidden="true" />

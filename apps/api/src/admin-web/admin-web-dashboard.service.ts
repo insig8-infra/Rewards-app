@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { ActorRole } from "@volt-rewards/domain";
+import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
 import {
   ADMIN_WEB_DASHBOARD_REPOSITORY,
   type AdminWebDashboard,
@@ -13,7 +13,7 @@ export class AdminWebDashboardService {
     private readonly repository: AdminWebDashboardRepository,
   ) {}
 
-  getDashboard(actorRole: ActorRole): Promise<AdminWebDashboard> {
-    return this.repository.getDashboard(actorRole);
+  getDashboard(actor: AuthenticatedActor): Promise<AdminWebDashboard> {
+    return this.repository.getDashboard(actor);
   }
 }

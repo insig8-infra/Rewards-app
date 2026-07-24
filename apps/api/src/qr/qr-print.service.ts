@@ -58,8 +58,8 @@ export class QrPrintService {
   }
 
   async reprintQr(command: ReprintQrCommand): Promise<PrintedQrUnit> {
-    if (command.actorRole !== ACTOR_ROLE.OWNER && command.actorRole !== ACTOR_ROLE.STAFF) {
-      throw new DomainError("QR_REPRINT_FORBIDDEN_ACTOR", "Only OWNER or STAFF can perform this QR operation.");
+    if (command.actorRole !== ACTOR_ROLE.OWNER && command.actorRole !== ACTOR_ROLE.ADMIN && command.actorRole !== ACTOR_ROLE.STAFF) {
+      throw new DomainError("QR_REPRINT_FORBIDDEN_ACTOR", "Only OWNER, ADMIN, or STAFF can perform this QR operation.");
     }
 
     const tokenValue = createQrTokenValue();

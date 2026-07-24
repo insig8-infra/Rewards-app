@@ -1,4 +1,4 @@
-export type DevActorRole = "OWNER" | "STAFF";
+export type DevActorRole = "OWNER" | "ADMIN" | "STAFF";
 
 export interface DevActor {
   readonly role: DevActorRole;
@@ -41,7 +41,6 @@ export interface AdminInvoiceSummary {
   readonly invoiceDate: string;
   readonly importedAt: string;
   readonly customerName: string;
-  readonly customerGstin?: string;
   readonly gstTotal: string;
   readonly finalTotal: string;
   readonly lineCount: number;
@@ -63,11 +62,10 @@ export interface AdminInvoiceSummary {
 export interface AdminInvoiceLine {
   readonly invoiceLineId: string;
   readonly externalLineId: string;
+  readonly sourceLineNo: string;
   readonly sku: string;
   readonly productName: string;
-  readonly brand?: string;
   readonly category?: string;
-  readonly hsnCode?: string;
   readonly unit: string;
   readonly quantity: number;
   readonly returnedQty: number;
@@ -79,11 +77,6 @@ export interface AdminInvoiceLine {
   readonly printableQuantity: number;
   readonly pointsPerUnit: number;
   readonly unitRate: string;
-  readonly taxableValue: string;
-  readonly gstRatePercent: string;
-  readonly cgstAmount: string;
-  readonly sgstAmount: string;
-  readonly igstAmount: string;
   readonly lineTotal: string;
   readonly qrUnits: readonly AdminInvoiceQrUnit[];
 }
@@ -129,27 +122,10 @@ export interface AdminInvoicePrintHistory {
 }
 
 export interface AdminInvoiceDetail extends AdminInvoiceSummary {
-  readonly seller: {
-    readonly name: string;
-    readonly gstin?: string;
-  };
   readonly customer: {
     readonly name: string;
-    readonly gstin?: string;
+    readonly state?: string;
   };
-  readonly placeOfSupply: string;
-  readonly paymentTerms?: string;
-  readonly paymentMode?: string;
-  readonly salesPerson?: string;
-  readonly taxableSubtotal: string;
-  readonly discountTotal: string;
-  readonly freightTotal: string;
-  readonly cgstTotal: string;
-  readonly sgstTotal: string;
-  readonly igstTotal: string;
-  readonly totalAmount: string;
-  readonly roundOff: string;
-  readonly amountInWords?: string;
   readonly lines: readonly AdminInvoiceLine[];
   readonly returnHistory: readonly AdminInvoiceReturnHistory[];
   readonly printHistory: readonly AdminInvoicePrintHistory[];
@@ -243,6 +219,8 @@ export interface AdminDashboardTopContractor {
 
 export interface AdminDashboard {
   readonly actorRole: DevActorRole;
+  readonly actorName?: string;
+  readonly actorLabel: string;
   readonly roleLabel: string;
   readonly allowedSections: readonly string[];
   readonly metrics: {
@@ -282,11 +260,24 @@ export interface AdminContractorSummary {
   readonly availablePoints: number;
   readonly siteCount: number;
   readonly scanCount: number;
+  readonly successfulScanCount: number;
+  readonly scannedBusinessInr: string;
   readonly rewardClaimCount: number;
+  readonly fulfilledRewardCount: number;
+  readonly fulfilledRewardValueInr: number;
   readonly siteSummary: string;
   readonly citySummary: string;
   readonly createdAt: string;
   readonly deactivatedAt?: string;
+}
+
+export interface AdminContractorScannedItemAnalytics {
+  readonly sku: string;
+  readonly productName: string;
+  readonly quantity: number;
+  readonly unitPriceInr: string;
+  readonly totalAmountInr: string;
+  readonly pointsCollected: number;
 }
 
 export interface AdminContractorSite {
@@ -298,9 +289,12 @@ export interface AdminContractorSite {
   readonly city?: string;
   readonly status: "ACTIVE" | "ARCHIVED";
   readonly scanCount: number;
+  readonly successfulScanCount: number;
   readonly qrValuePoints: number;
   readonly creditedPoints: number;
+  readonly scannedBusinessInr: string;
   readonly productSummary: string;
+  readonly scannedItems: readonly AdminContractorScannedItemAnalytics[];
 }
 
 export interface AdminContractorDetail extends AdminContractorSummary {
@@ -328,6 +322,7 @@ export interface AdminContractorMpinResetResult {
 export interface AdminStaffSummary {
   readonly staffId: string;
   readonly userId: string;
+  readonly role: "ADMIN" | "STAFF";
   readonly name: string;
   readonly mobileNumber: string;
   readonly photoUrl?: string;
@@ -336,6 +331,7 @@ export interface AdminStaffSummary {
   readonly deactivatedAt?: string;
   readonly lastOpenedAt?: string;
   readonly createdByOwnerId?: string;
+  readonly createdByLabel?: string;
 }
 
 export interface AdminStaffWriteInput {
@@ -530,6 +526,7 @@ export interface AdminPromotion {
   readonly assetUrl?: string;
   readonly assetAltText?: string;
   readonly overlayText?: string;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: number;
   readonly overlayFontFamily: AdminPromotionFontFamily;
@@ -558,6 +555,7 @@ export interface AdminPromotionWriteInput {
   readonly assetAltText?: string | null;
   readonly assetUpload?: AdminPromotionAssetInput;
   readonly overlayText?: string | null;
+  readonly backgroundColor?: string;
   readonly overlayTextColor?: string;
   readonly overlayFontSize?: number;
   readonly overlayFontFamily?: AdminPromotionFontFamily;
@@ -679,6 +677,33 @@ export interface AdminApiClientOptions {
   readonly fetcher?: typeof fetch;
 }
 
+export class AdminApiError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+  readonly responseText: string | undefined;
+
+  constructor(
+    message: string,
+    details: { readonly status: number; readonly code?: string | undefined; readonly responseText?: string | undefined },
+  ) {
+    super(message);
+    this.name = "AdminApiError";
+    this.status = details.status;
+    this.code = details.code;
+    this.responseText = details.responseText;
+  }
+}
+
+export function isAdminApiError(error: unknown): error is AdminApiError {
+  return (
+    error instanceof AdminApiError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { readonly name?: unknown }).name === "AdminApiError" &&
+      typeof (error as { readonly status?: unknown }).status === "number")
+  );
+}
+
 export function createAdminApiClient(options: AdminApiClientOptions = {}) {
   const apiBaseUrl = (
     options.apiBaseUrl ??
@@ -697,7 +722,7 @@ export function createAdminApiClient(options: AdminApiClientOptions = {}) {
     });
 
     if (!response.ok) {
-      throw new Error(`API ${response.status}: ${await response.text()}`);
+      throw await toAdminApiError(response);
     }
 
     return (await response.json()) as T;
@@ -714,7 +739,7 @@ export function createAdminApiClient(options: AdminApiClientOptions = {}) {
     });
 
     if (!response.ok) {
-      throw new Error(`API ${response.status}: ${await response.text()}`);
+      throw await toAdminApiError(response);
     }
 
     const contentType = response.headers.get("content-type") ?? "application/octet-stream";
@@ -762,13 +787,20 @@ export function createAdminApiClient(options: AdminApiClientOptions = {}) {
       }),
 
     listStaff: () => request<readonly AdminStaffSummary[]>("/admin-web/staff"),
+    listAdmins: () => request<readonly AdminStaffSummary[]>("/admin-web/admins"),
 
     getStaffDetail: (staffId: string) => request<AdminStaffSummary>(`/admin-web/staff/${staffId}`),
+    getAdminDetail: (adminId: string) => request<AdminStaffSummary>(`/admin-web/admins/${adminId}`),
 
     getMyStaffProfile: () => request<AdminStaffSummary>("/admin-web/staff/me"),
 
     createStaff: (input: AdminStaffWriteInput) =>
       request<AdminStaffMutationResult>("/admin-web/staff", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    createAdmin: (input: AdminStaffWriteInput) =>
+      request<AdminStaffMutationResult>("/admin-web/admins", {
         method: "POST",
         body: JSON.stringify(input),
       }),
@@ -789,14 +821,26 @@ export function createAdminApiClient(options: AdminApiClientOptions = {}) {
       request<AdminStaffMutationResult>(`/admin-web/staff/${staffId}/reset-pin`, {
         method: "POST",
       }),
+    resetAdminPin: (adminId: string) =>
+      request<AdminStaffMutationResult>(`/admin-web/admins/${adminId}/reset-pin`, {
+        method: "POST",
+      }),
 
     deactivateStaff: (staffId: string) =>
       request<AdminStaffSummary>(`/admin-web/staff/${staffId}/deactivate`, {
         method: "POST",
       }),
+    deactivateAdmin: (adminId: string) =>
+      request<AdminStaffSummary>(`/admin-web/admins/${adminId}/deactivate`, {
+        method: "POST",
+      }),
 
     reactivateStaff: (staffId: string) =>
       request<AdminStaffSummary>(`/admin-web/staff/${staffId}/reactivate`, {
+        method: "POST",
+      }),
+    reactivateAdmin: (adminId: string) =>
+      request<AdminStaffSummary>(`/admin-web/admins/${adminId}/reactivate`, {
         method: "POST",
       }),
 
@@ -948,6 +992,43 @@ export function createAdminApiClient(options: AdminApiClientOptions = {}) {
         body: JSON.stringify({ format, filters }),
       }),
   };
+}
+
+async function toAdminApiError(response: Response): Promise<AdminApiError> {
+  const responseText = await response.text();
+  const parsed = parseAdminApiErrorBody(responseText);
+  return new AdminApiError((parsed.message ?? response.statusText) || "Request failed", {
+    status: response.status,
+    code: parsed.code,
+    responseText,
+  });
+}
+
+function parseAdminApiErrorBody(responseText: string): { readonly message?: string; readonly code?: string } {
+  if (!responseText.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as unknown;
+    if (typeof parsed !== "object" || parsed === null) {
+      return { message: responseText };
+    }
+    const body = parsed as { readonly message?: unknown; readonly code?: unknown; readonly error?: unknown };
+    const message = Array.isArray(body.message)
+      ? body.message.filter((value): value is string => typeof value === "string").join(" ")
+      : typeof body.message === "string"
+        ? body.message
+        : typeof body.error === "string"
+          ? body.error
+          : undefined;
+    return {
+      ...(message ? { message } : {}),
+      ...(typeof body.code === "string" ? { code: body.code } : {}),
+    };
+  } catch {
+    return { message: responseText };
+  }
 }
 
 export function actorHeaders(actor: DevActor): Record<string, string> {

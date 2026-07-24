@@ -47,4 +47,20 @@ test("OWNER can manage staff, export reports, fulfill rewards, reward catalog, a
   assert.equal(can(ACTOR_ROLE.OWNER, ACTION.ADMIN_MANAGE_PROMOTIONS), true);
   assert.equal(can(ACTOR_ROLE.OWNER, ACTION.ADMIN_VIEW_ITEM_CODES), true);
   assert.equal(can(ACTOR_ROLE.OWNER, ACTION.ADMIN_MANAGE_ITEM_CODES), true);
+  assert.equal(can(ACTOR_ROLE.OWNER, ACTION.ADMIN_MANAGE_ADMINS), true);
+});
+
+test("ADMIN has owner-like operating permissions except Admin account management", () => {
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_PRINT_QR), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_VIEW_CONTRACTOR), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_REGISTER_CONTRACTOR), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_EDIT_CONTRACTOR), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_MANAGE_STAFF), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.REPORT_EXPORT), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_FULFILL_REWARD), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_MANAGE_REWARD_CATALOG), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_MANAGE_PROMOTIONS), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_VIEW_ITEM_CODES), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_MANAGE_ITEM_CODES), true);
+  assert.equal(can(ACTOR_ROLE.ADMIN, ACTION.ADMIN_MANAGE_ADMINS), false);
 });

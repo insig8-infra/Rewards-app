@@ -28,13 +28,12 @@ test("PromotionsService rejects activation without promotion media", async () =>
       {
         title: "NEW SALE IS ON!",
         body: "Earn extra rewards this week.",
-        overlayText: "NEW SALE IS ON!",
         status: "ACTIVE",
         targetPersona: "ALL",
       },
       new Date("2026-07-08T10:00:00.000Z"),
     ),
-    /promotion image before activation/i,
+    /promotion image or overlaid text before activation/i,
   );
   assert.equal(fake.state.audits.length, 0);
 });
@@ -48,7 +47,6 @@ test("PromotionsService audits create and deactivate with robust actor user look
       title: "NEW SALE IS ON!",
       body: "Earn extra rewards this week.",
       assetUrl: "https://example.test/banner.jpg",
-      overlayText: "NEW SALE IS ON!",
       targetPersona: "ALL",
     },
     new Date("2026-07-08T10:00:00.000Z"),
@@ -74,8 +72,8 @@ test("PromotionsService persists capped marquee and Hindi-safe font controls", a
     {
       title: "Monsoon Rewards",
       body: "Scroll this offer across the app banner.",
-      assetUrl: "https://example.test/monsoon.jpg",
       overlayText: "मानसून बोनस",
+      backgroundColor: "#d8eee9",
       overlayTextColor: "#0A4F57",
       overlayFontFamily: "hind",
       overlayFontStyle: "boldItalic",
@@ -88,6 +86,7 @@ test("PromotionsService persists capped marquee and Hindi-safe font controls", a
   assert.equal(created.overlayFontFamily, "hind");
   assert.equal(created.overlayFontStyle, "boldItalic");
   assert.equal(created.marqueeEnabled, true);
+  assert.equal(created.backgroundColor, "#D8EEE9");
 
   await assert.rejects(
     service.updatePromotion(
@@ -97,6 +96,26 @@ test("PromotionsService persists capped marquee and Hindi-safe font controls", a
       new Date("2026-07-08T10:05:00.000Z"),
     ),
     /font family is invalid/i,
+  );
+});
+
+test("PromotionsService rejects image and overlaid text in the same banner", async () => {
+  const fake = createFakePrisma();
+  const service = new PromotionsService(fake.prisma);
+
+  await assert.rejects(
+    service.createPromotion(
+      { role: ACTOR_ROLE.OWNER, userId: "owner_user_1" },
+      {
+        title: "Mixed Mode",
+        body: "This should not save.",
+        assetUrl: "https://example.test/mixed.jpg",
+        overlayText: "Mixed",
+        targetPersona: "ALL",
+      },
+      new Date("2026-07-08T10:00:00.000Z"),
+    ),
+    /either an image or overlaid text/i,
   );
 });
 
@@ -188,6 +207,7 @@ type FakePromotion = {
   readonly assetUrl: string | null;
   readonly assetAltText: string | null;
   readonly overlayText: string | null;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: number;
   readonly overlayFontFamily: string;
@@ -211,6 +231,7 @@ function promotion(overrides: Partial<FakePromotion> = {}): FakePromotion {
     assetUrl: "https://example.test/banner.jpg",
     assetAltText: null,
     overlayText: null,
+    backgroundColor: "#00535B",
     overlayTextColor: "#FFFFFF",
     overlayFontSize: 28,
     overlayFontFamily: "noto-sans-devanagari",

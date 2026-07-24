@@ -33,11 +33,11 @@ type StatusState = {
 };
 
 interface PromotionDraft {
-  readonly title: string;
   readonly body: string;
   readonly assetUrl: string;
   readonly assetAltText: string;
   readonly overlayText: string;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: string;
   readonly overlayFontFamily: AdminPromotionFontFamily;
@@ -53,11 +53,11 @@ const allowedPromotionAssetTypes = new Set(["image/png", "image/jpeg", "image/gi
 const promotionAssetAccept = ".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif";
 
 const emptyDraft: PromotionDraft = {
-  title: "",
   body: "",
   assetUrl: "",
   assetAltText: "",
   overlayText: "",
+  backgroundColor: "#00535B",
   overlayTextColor: "#FFFFFF",
   overlayFontSize: "28",
   overlayFontFamily: "noto-sans-devanagari",
@@ -71,11 +71,11 @@ const promotionFontFamilyOptions: readonly {
   readonly label: string;
   readonly css: string;
 }[] = [
-  { value: "noto-sans-devanagari", label: "Noto Sans Devanagari", css: "\"Noto Sans Devanagari\", \"Hind\", system-ui, sans-serif" },
-  { value: "noto-serif-devanagari", label: "Noto Serif Devanagari", css: "\"Noto Serif Devanagari\", Georgia, serif" },
-  { value: "hind", label: "Hind", css: "Hind, \"Noto Sans Devanagari\", system-ui, sans-serif" },
-  { value: "mukta", label: "Mukta", css: "Mukta, \"Noto Sans Devanagari\", system-ui, sans-serif" },
-  { value: "inter", label: "Inter", css: "Inter, system-ui, sans-serif" },
+  { value: "noto-sans-devanagari", label: "Noto Sans Devanagari", css: "var(--font-noto-sans-devanagari), var(--font-hind), system-ui, sans-serif" },
+  { value: "noto-serif-devanagari", label: "Noto Serif Devanagari", css: "var(--font-noto-serif-devanagari), Georgia, serif" },
+  { value: "hind", label: "Hind", css: "var(--font-hind), var(--font-noto-sans-devanagari), system-ui, sans-serif" },
+  { value: "mukta", label: "Mukta", css: "var(--font-mukta), var(--font-noto-sans-devanagari), system-ui, sans-serif" },
+  { value: "inter", label: "Inter", css: "var(--font-inter), system-ui, sans-serif" },
   { value: "system", label: "System UI", css: "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif" },
 ];
 
@@ -211,17 +211,20 @@ function PromotionsContent() {
     setDraft((current) => ({
       ...current,
       assetUrl: "",
-      assetAltText: current.assetAltText || current.title,
+      assetAltText: current.assetAltText || current.body || file.name,
+      overlayText: "",
       assetUpload: {
         fileName: file.name,
         contentType: file.type,
         dataUrl,
-        altText: current.assetAltText || current.title || file.name,
+        altText: current.assetAltText || current.body || file.name,
       },
       uploadPreviewUrl: dataUrl,
     }));
     setStatus({ tone: "success", message: "Promotion image selected. Save to upload it." });
   }
+
+  const draftHasImage = hasDraftImage(draft);
 
   if (mode === "landing") {
     return (
@@ -274,7 +277,7 @@ function PromotionsContent() {
           <div className="panel-header compact-header">
             <div>
               <h2 className="panel-title">Promotion Register</h2>
-              <div className="panel-subtitle">OWNER-only campaign history and current state.</div>
+              <div className="panel-subtitle">OWNER/Admin campaign history and current state.</div>
             </div>
             <ShieldCheck size={18} aria-hidden="true" />
           </div>
@@ -323,67 +326,71 @@ function PromotionsContent() {
           </div>
 
           <div className="form-grid">
-            <label className="field">
-              <span className="field-label">Title</span>
-              <input className="text-input" maxLength={80} value={draft.title} onChange={(event) => setDraftValue("title", event.target.value)} />
-            </label>
-            <label className="field">
-              <span className="field-label">Overlay text</span>
-              <input className="text-input" maxLength={60} value={draft.overlayText} onChange={(event) => setDraftValue("overlayText", event.target.value)} />
-            </label>
             <label className="field wide-field">
               <span className="field-label">Body</span>
               <textarea className="text-input promotion-textarea" maxLength={180} value={draft.body} onChange={(event) => setDraftValue("body", event.target.value)} />
             </label>
-            <label className="field">
-              <span className="field-label">Overlay color</span>
-              <input className="color-input" type="color" value={draft.overlayTextColor} onChange={(event) => setDraftValue("overlayTextColor", event.target.value)} />
-            </label>
-            <label className="field">
-              <span className="field-label">Font size</span>
-              <input className="text-input" inputMode="numeric" value={draft.overlayFontSize} onChange={(event) => setDraftValue("overlayFontSize", event.target.value.replace(/\D/g, ""))} />
-            </label>
-            <label className="field">
-              <span className="field-label">Font type</span>
-              <select className="select-input" value={draft.overlayFontFamily} onChange={(event) => setDraftValue("overlayFontFamily", event.target.value as AdminPromotionFontFamily)}>
-                {promotionFontFamilyOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <fieldset className="field toggle-field">
-              <legend className="field-label">Text treatment</legend>
-              <label className="check-row">
-                <input
-                  checked={isBoldStyle(draft.overlayFontStyle)}
-                  className="checkbox"
-                  type="checkbox"
-                  onChange={(event) => setDraftValue("overlayFontStyle", fontStyleFromToggles(event.target.checked, isItalicStyle(draft.overlayFontStyle)))}
-                />
-                <span>Bold</span>
-              </label>
-              <label className="check-row">
-                <input
-                  checked={isItalicStyle(draft.overlayFontStyle)}
-                  className="checkbox"
-                  type="checkbox"
-                  onChange={(event) => setDraftValue("overlayFontStyle", fontStyleFromToggles(isBoldStyle(draft.overlayFontStyle), event.target.checked))}
-                />
-                <span>Italic</span>
-              </label>
-            </fieldset>
-            <div className="field toggle-field">
-              <span className="field-label">Horizontal scroller</span>
-              <label className="check-row">
-                <input
-                  checked={draft.marqueeEnabled}
-                  className="checkbox"
-                  type="checkbox"
-                  onChange={(event) => setDraftValue("marqueeEnabled", event.target.checked)}
-                />
-                <span>Marquee text</span>
-              </label>
-            </div>
+            {!draftHasImage ? (
+              <>
+                <label className="field">
+                  <span className="field-label">Overlaid text</span>
+                  <input className="text-input" maxLength={60} value={draft.overlayText} onChange={(event) => setDraftValue("overlayText", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span className="field-label">Background colour</span>
+                  <input className="color-input" type="color" value={draft.backgroundColor} onChange={(event) => setDraftValue("backgroundColor", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span className="field-label">Text colour</span>
+                  <input className="color-input" type="color" value={draft.overlayTextColor} onChange={(event) => setDraftValue("overlayTextColor", event.target.value)} />
+                </label>
+                <label className="field">
+                  <span className="field-label">Font size</span>
+                  <input className="text-input" inputMode="numeric" value={draft.overlayFontSize} onChange={(event) => setDraftValue("overlayFontSize", event.target.value.replace(/\D/g, ""))} />
+                </label>
+                <label className="field">
+                  <span className="field-label">Font type</span>
+                  <select className="select-input" value={draft.overlayFontFamily} onChange={(event) => setDraftValue("overlayFontFamily", event.target.value as AdminPromotionFontFamily)}>
+                    {promotionFontFamilyOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <fieldset className="field toggle-field">
+                  <legend className="field-label">Text treatment</legend>
+                  <label className="check-row">
+                    <input
+                      checked={isBoldStyle(draft.overlayFontStyle)}
+                      className="checkbox"
+                      type="checkbox"
+                      onChange={(event) => setDraftValue("overlayFontStyle", fontStyleFromToggles(event.target.checked, isItalicStyle(draft.overlayFontStyle)))}
+                    />
+                    <span>Bold</span>
+                  </label>
+                  <label className="check-row">
+                    <input
+                      checked={isItalicStyle(draft.overlayFontStyle)}
+                      className="checkbox"
+                      type="checkbox"
+                      onChange={(event) => setDraftValue("overlayFontStyle", fontStyleFromToggles(isBoldStyle(draft.overlayFontStyle), event.target.checked))}
+                    />
+                    <span>Italic</span>
+                  </label>
+                </fieldset>
+                <div className="field toggle-field">
+                  <span className="field-label">Horizontal scroller</span>
+                  <label className="check-row">
+                    <input
+                      checked={draft.marqueeEnabled}
+                      className="checkbox"
+                      type="checkbox"
+                      onChange={(event) => setDraftValue("marqueeEnabled", event.target.checked)}
+                    />
+                    <span>Marquee text</span>
+                  </label>
+                </div>
+              </>
+            ) : null}
             <label className="field">
               <span className="field-label">Expiry</span>
               <input className="text-input" type="datetime-local" value={draft.endsAt} onChange={(event) => setDraftValue("endsAt", event.target.value)} />
@@ -411,6 +418,11 @@ function PromotionsContent() {
               label="Browse promotion image"
               onFile={(file) => void handlePromotionAsset(file)}
             />
+            {draftHasImage ? (
+              <button className="button compact" disabled={busy} type="button" onClick={clearPromotionImage}>
+                Remove image
+              </button>
+            ) : null}
           </div>
 
           <div className="actions">
@@ -453,8 +465,36 @@ function PromotionsContent() {
     </div>
   );
 
+  function clearPromotionImage(): void {
+    setDraft((current) => {
+      const { assetUpload: _assetUpload, uploadPreviewUrl: _uploadPreviewUrl, ...rest } = current;
+      return {
+        ...rest,
+        assetUrl: "",
+        assetAltText: "",
+      };
+    });
+  }
+
   function setDraftValue<Key extends keyof PromotionDraft>(key: Key, value: PromotionDraft[Key]): void {
-    setDraft((current) => ({ ...current, [key]: value }));
+    setDraft((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "overlayText" && typeof value === "string" && value.trim().length > 0) {
+        const { assetUpload: _assetUpload, uploadPreviewUrl: _uploadPreviewUrl, ...rest } = next;
+        return {
+          ...rest,
+          assetUrl: "",
+          assetAltText: "",
+        };
+      }
+      if (key === "assetUrl" && typeof value === "string" && value.trim().length > 0) {
+        return {
+          ...next,
+          overlayText: "",
+        };
+      }
+      return next;
+    });
   }
 }
 
@@ -466,6 +506,10 @@ function Metric({ label, meta, value }: { readonly label: string; readonly meta:
       <div className="metric-meta">{meta}</div>
     </div>
   );
+}
+
+function hasDraftImage(draft: PromotionDraft): boolean {
+  return Boolean(draft.uploadPreviewUrl || draft.assetUpload || draft.assetUrl.trim());
 }
 
 function PromotionList({
@@ -492,10 +536,10 @@ function PromotionList({
       {promotions.map((promotion) => (
         <div className="promotion-row" key={promotion.promotionId}>
           <div className="promotion-row-media">
-            {promotion.assetUrl ? <img alt={promotion.assetAltText ?? promotion.title} src={promotion.assetUrl} /> : <Megaphone size={18} aria-hidden="true" />}
+            {promotion.assetUrl ? <img alt={promotion.assetAltText ?? promotionDisplayTitle(promotion)} src={promotion.assetUrl} /> : <Megaphone size={18} aria-hidden="true" />}
           </div>
           <div className="promotion-row-copy">
-            <strong>{promotion.title}</strong>
+            <strong>{promotionDisplayTitle(promotion)}</strong>
             <span>{promotion.body}</span>
             <div className="promotion-row-meta">
               <StatusBadge promotion={promotion} />
@@ -530,8 +574,19 @@ function StatusBadge({ promotion }: { readonly promotion: AdminPromotion }) {
 }
 
 function PromotionPreview({ promotion }: { readonly promotion: AdminPromotion }) {
+  if (promotion.assetUrl) {
+    return (
+      <div
+        aria-label={promotion.assetAltText ?? promotionDisplayTitle(promotion)}
+        className="promotion-preview image-only"
+        role="img"
+        style={{ backgroundImage: `url(${promotion.assetUrl})` }}
+      />
+    );
+  }
+
   return (
-    <div className="promotion-preview" style={{ backgroundImage: promotion.assetUrl ? `url(${promotion.assetUrl})` : undefined }}>
+    <div className="promotion-preview" style={{ background: promotion.backgroundColor }}>
       <div className="promotion-preview-shade">
         <div
           className={`promotion-preview-title ${fontStyleClass(promotion.overlayFontStyle)} ${promotion.marqueeEnabled ? "marquee" : ""}`}
@@ -541,7 +596,7 @@ function PromotionPreview({ promotion }: { readonly promotion: AdminPromotion })
             fontSize: `${promotion.overlayFontSize}px`,
           }}
         >
-          <span>{promotion.overlayText || promotion.title}</span>
+          <span>{promotionDisplayTitle(promotion)}</span>
         </div>
         <p>{promotion.body}</p>
       </div>
@@ -551,9 +606,20 @@ function PromotionPreview({ promotion }: { readonly promotion: AdminPromotion })
 
 function DraftPromotionPreview({ draft }: { readonly draft: PromotionDraft }) {
   const previewUrl = draft.uploadPreviewUrl || draft.assetUrl.trim();
-  const title = draft.overlayText.trim() || draft.title.trim() || "Promotion headline";
+  if (previewUrl) {
+    return (
+      <div
+        aria-label={draft.assetAltText.trim() || draft.body.trim() || "Promotion image"}
+        className="promotion-preview image-only"
+        role="img"
+        style={{ backgroundImage: `url(${previewUrl})` }}
+      />
+    );
+  }
+
+  const title = draft.overlayText.trim() || "Promotion headline";
   return (
-    <div className="promotion-preview" style={{ backgroundImage: previewUrl ? `url(${previewUrl})` : undefined }}>
+    <div className="promotion-preview" style={{ background: draft.backgroundColor }}>
       <div className="promotion-preview-shade">
         <div
           className={`promotion-preview-title ${fontStyleClass(draft.overlayFontStyle)} ${draft.marqueeEnabled ? "marquee" : ""}`}
@@ -573,11 +639,11 @@ function DraftPromotionPreview({ draft }: { readonly draft: PromotionDraft }) {
 
 function draftFromPromotion(promotion: AdminPromotion): PromotionDraft {
   return {
-    title: promotion.title,
     body: promotion.body,
     assetUrl: promotion.assetUrl ?? "",
     assetAltText: promotion.assetAltText ?? "",
     overlayText: promotion.overlayText ?? "",
+    backgroundColor: promotion.backgroundColor,
     overlayTextColor: promotion.overlayTextColor,
     overlayFontSize: String(promotion.overlayFontSize),
     overlayFontFamily: promotion.overlayFontFamily,
@@ -588,11 +654,18 @@ function draftFromPromotion(promotion: AdminPromotion): PromotionDraft {
 }
 
 function buildPromotionPayload(draft: PromotionDraft): AdminPromotionWriteInput {
+  const imageMode = hasDraftImage(draft);
+  const body = draft.body.trim();
+  const overlayText = draft.overlayText.trim();
+  const fallbackTitle = imageMode
+    ? draft.assetAltText.trim() || body || "Promotion image"
+    : overlayText || body || "Promotion";
   const basePayload = {
-    title: draft.title,
-    body: draft.body,
-    assetAltText: draft.assetAltText.trim() || null,
-    overlayText: draft.overlayText.trim() || null,
+    title: fallbackTitle.slice(0, 80),
+    body,
+    assetAltText: imageMode ? draft.assetAltText.trim() || fallbackTitle : null,
+    overlayText: imageMode ? null : overlayText || null,
+    backgroundColor: draft.backgroundColor,
     overlayTextColor: draft.overlayTextColor,
     overlayFontSize: Number(draft.overlayFontSize) || 28,
     overlayFontFamily: draft.overlayFontFamily,
@@ -604,14 +677,19 @@ function buildPromotionPayload(draft: PromotionDraft): AdminPromotionWriteInput 
   if (draft.assetUpload) {
     return {
       ...basePayload,
+      assetUrl: null,
       assetUpload: draft.assetUpload,
     };
   } else {
     return {
       ...basePayload,
-      assetUrl: draft.assetUrl.trim() || null,
+      assetUrl: imageMode ? draft.assetUrl.trim() || null : null,
     };
   }
+}
+
+function promotionDisplayTitle(promotion: AdminPromotion): string {
+  return promotion.overlayText || promotion.title || "Promotion";
 }
 
 function isExpired(promotion: AdminPromotion): boolean {

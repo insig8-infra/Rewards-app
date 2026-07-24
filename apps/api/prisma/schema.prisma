@@ -9,6 +9,7 @@ datasource db {
 
 enum UserRole {
   OWNER
+  ADMIN
   STAFF
   CONTRACTOR
   TEAM_MEMBER
@@ -644,6 +645,7 @@ model Promotion {
   assetUrl      String?
   assetAltText  String?
   overlayText   String?
+  backgroundColor String              @default("#00535B")
   overlayTextColor String              @default("#FFFFFF")
   overlayFontSize  Int                 @default(24)
   overlayFontFamily String             @default("noto-sans-devanagari")

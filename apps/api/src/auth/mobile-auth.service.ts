@@ -97,7 +97,7 @@ export interface AdminSessionPayload {
   readonly token: string;
   readonly expiresAt: Date;
   readonly actor: {
-    readonly role: "OWNER" | "STAFF";
+    readonly role: "OWNER" | "ADMIN" | "STAFF";
     readonly userId: string;
   };
 }
@@ -110,7 +110,7 @@ export interface AdminAuthResult {
 
 export interface PublicAdminAuthProfile {
   readonly userId: string;
-  readonly role: "OWNER" | "STAFF";
+  readonly role: "OWNER" | "ADMIN" | "STAFF";
   readonly name: string;
   readonly mobileNumber: string;
   readonly photoUrl?: string;
@@ -320,7 +320,7 @@ export class MobileAuthService {
 
   async loginAdmin(
     input: {
-      readonly role: "OWNER" | "STAFF";
+      readonly role: "OWNER" | "ADMIN" | "STAFF";
       readonly mobileNumber: string;
       readonly pin: string;
       readonly surface?: "ADMIN_MOBILE" | "ADMIN_WEB";

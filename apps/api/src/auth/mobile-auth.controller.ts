@@ -9,7 +9,7 @@ export class MobileAuthController {
   loginAdmin(
     @Body()
     body: {
-      readonly role: "OWNER" | "STAFF";
+      readonly role: "OWNER" | "ADMIN" | "STAFF";
       readonly mobileNumber: string;
       readonly pin: string;
       readonly surface?: "ADMIN_MOBILE" | "ADMIN_WEB";

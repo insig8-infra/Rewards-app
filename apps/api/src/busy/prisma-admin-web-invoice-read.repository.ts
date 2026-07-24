@@ -9,7 +9,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import type {
   AdminWebInvoiceDetail,
   AdminWebInvoiceLine,
-  AdminWebInvoiceParty,
+  AdminWebInvoiceCustomer,
   AdminWebInvoiceReturnHistory,
   AdminWebInvoiceReadRepository,
   AdminWebInvoiceSummary,
@@ -179,10 +179,6 @@ export class PrismaAdminWebInvoiceReadRepository implements AdminWebInvoiceReadR
       ),
     });
 
-    const paymentTerms = readString(raw, "paymentTerms", "");
-    const paymentMode = readString(raw, "paymentMode", "");
-    const salesPerson = readString(raw, "salesPerson", "");
-    const amountInWords = readString(raw, "amountInWords", "");
     const itemCodes = await this.prisma.itemCode.findMany({
       where: { tempItemCode: { in: invoice.lines.map((line) => line.sku) } },
       select: {
@@ -197,21 +193,7 @@ export class PrismaAdminWebInvoiceReadRepository implements AdminWebInvoiceReadR
 
     return {
       ...summary,
-      seller: readParty(asRecord(raw.seller), "Volt Electricals"),
-      customer: readParty(asRecord(raw.customer), invoice.customerRef ?? "Customer"),
-      placeOfSupply: readString(raw, "placeOfSupply", ""),
-      ...(paymentTerms ? { paymentTerms } : {}),
-      ...(paymentMode ? { paymentMode } : {}),
-      ...(salesPerson ? { salesPerson } : {}),
-      taxableSubtotal: readString(raw, "taxableSubtotal", "0.00"),
-      discountTotal: readString(raw, "discountTotal", "0.00"),
-      freightTotal: readString(raw, "freightTotal", "0.00"),
-      cgstTotal: readString(raw, "cgstTotal", "0.00"),
-      sgstTotal: readString(raw, "sgstTotal", "0.00"),
-      igstTotal: readString(raw, "igstTotal", "0.00"),
-      totalAmount: readString(raw, "totalAmount", summary.finalTotal),
-      roundOff: readString(raw, "roundOff", "0.00"),
-      ...(amountInWords ? { amountInWords } : {}),
+      customer: readCustomer(raw, invoice.customerRef ?? summary.customerName),
       lines: invoice.lines.map((line): AdminWebInvoiceLine => {
         const lineRaw = asRecord(line.rawSource);
         const notPrintedQuantity = line.qrUnits.filter((qr) => qr.status === "NOT_PRINTED").length;
@@ -227,19 +209,16 @@ export class PrismaAdminWebInvoiceReadRepository implements AdminWebInvoiceReadR
           notPrintedQuantity,
         });
 
-        const brand = readString(lineRaw, "brand", "");
         const category = readString(lineRaw, "category", line.category ?? "");
-        const hsnCode = readString(lineRaw, "hsnCode", "");
         const itemCode = itemCodeBySku.get(line.sku);
 
         return {
           invoiceLineId: line.id,
           externalLineId: line.externalLineId,
+          sourceLineNo: readStringOrNumber(lineRaw, "SrNo", line.externalLineId),
           sku: line.sku,
           productName: line.productName,
-          ...(brand ? { brand } : {}),
           ...(category ? { category } : {}),
-          ...(hsnCode ? { hsnCode } : {}),
           unit: readString(lineRaw, "unit", "Pcs"),
           quantity: line.quantity,
           returnedQty,
@@ -261,11 +240,6 @@ export class PrismaAdminWebInvoiceReadRepository implements AdminWebInvoiceReadR
               })
             : line.pointsPerUnit,
           unitRate: readString(lineRaw, "unitRate", "0.00"),
-          taxableValue: readString(lineRaw, "taxableValue", "0.00"),
-          gstRatePercent: readString(lineRaw, "gstRatePercent", "0.00"),
-          cgstAmount: readString(lineRaw, "cgstAmount", "0.00"),
-          sgstAmount: readString(lineRaw, "sgstAmount", "0.00"),
-          igstAmount: readString(lineRaw, "igstAmount", "0.00"),
           lineTotal: readString(lineRaw, "lineTotal", "0.00"),
           qrUnits: line.qrUnits.map((qr) => ({
             qrUnitId: qr.id,
@@ -351,8 +325,6 @@ function buildSummary(input: {
       })
     );
   }, 0);
-  const customerGstin = readString(customer, "gstin", "");
-
   return {
     invoiceId: input.invoiceId,
     externalInvoiceId: input.externalInvoiceId,
@@ -360,7 +332,6 @@ function buildSummary(input: {
     invoiceDate: input.invoiceDate,
     importedAt: input.importedAt,
     customerName: readString(customer, "name", readString(input.raw, "customerRef", "Customer")),
-    ...(customerGstin ? { customerGstin } : {}),
     gstTotal: readString(input.raw, "gstTotal", "0.00"),
     finalTotal: readString(input.raw, "finalTotal", "0.00"),
     lineCount: input.lines.length,
@@ -380,20 +351,13 @@ function buildSummary(input: {
   };
 }
 
-function readParty(raw: JsonRecord, fallbackName: string): AdminWebInvoiceParty {
-  const gstin = readString(raw, "gstin", "");
-  const addressLine2 = readString(raw, "addressLine2", "");
-  const phone = readString(raw, "phone", "");
+function readCustomer(raw: JsonRecord, fallbackName: string): AdminWebInvoiceCustomer {
+  const customer = asRecord(raw.customer);
+  const state = readString(customer, "state", readString(raw, "placeOfSupply", ""));
 
   return {
-    name: readString(raw, "name", fallbackName),
-    ...(gstin ? { gstin } : {}),
-    addressLine1: readString(raw, "addressLine1", ""),
-    ...(addressLine2 ? { addressLine2 } : {}),
-    city: readString(raw, "city", ""),
-    state: readString(raw, "state", ""),
-    pincode: readString(raw, "pincode", ""),
-    ...(phone ? { phone } : {}),
+    name: readString(customer, "name", fallbackName),
+    ...(state ? { state } : {}),
   };
 }
 
@@ -407,6 +371,17 @@ function asRecord(value: unknown): JsonRecord {
 function readString(raw: JsonRecord, key: string, fallback: string): string {
   const value = raw[key];
   return typeof value === "string" ? value : fallback;
+}
+
+function readStringOrNumber(raw: JsonRecord, key: string, fallback: string): string {
+  const value = raw[key];
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return fallback;
 }
 
 function readNumber(raw: JsonRecord, key: string): number {

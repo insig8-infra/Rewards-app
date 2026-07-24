@@ -23,6 +23,8 @@ import { Avatar, ProfilePhotoUpload } from "./ProfilePhotoUpload";
 
 type StaffFilter = "all" | "active" | "deactivated";
 type StaffSort = "newest" | "name" | "last-opened";
+type ManagedAccountKind = "staff" | "admin";
+type AdminApiClient = ReturnType<typeof createAdminApiClient>;
 
 interface StaffFormState {
   readonly name: string;
@@ -36,10 +38,85 @@ const emptyForm: StaffFormState = {
   photoUrl: "",
 };
 
+interface ManagedAccountCopy {
+  readonly activeSection: "staff" | "admins";
+  readonly title: string;
+  readonly createTitle: string;
+  readonly detailTitle: string;
+  readonly eyebrow: string;
+  readonly createEyebrow: string;
+  readonly detailEyebrow: string;
+  readonly heading: string;
+  readonly createHeading: string;
+  readonly badge: string;
+  readonly singular: string;
+  readonly plural: string;
+  readonly pluralLower: string;
+  readonly directoryLabel: string;
+  readonly identityLabel: string;
+  readonly photoLabel: string;
+  readonly controlsSubtitle: string;
+  readonly managementCopy: string;
+  readonly listEmpty: string;
+}
+
+const managedAccountCopy: Record<ManagedAccountKind, ManagedAccountCopy> = {
+  staff: {
+    activeSection: "staff",
+    title: "Staff",
+    createTitle: "Add Staff",
+    detailTitle: "Staff Detail",
+    eyebrow: "Staff Management",
+    createEyebrow: "Add Staff",
+    detailEyebrow: "Staff Detail",
+    heading: "Create staff accounts and control delegated access",
+    createHeading: "Create a staff account with a temporary PIN",
+    badge: "OWNER / ADMIN",
+    singular: "Staff",
+    plural: "Staff",
+    pluralLower: "staff",
+    directoryLabel: "Staff directory",
+    identityLabel: "Staff identity",
+    photoLabel: "Staff photo",
+    controlsSubtitle: "OWNER/Admin state changes",
+    managementCopy: "OWNER/Admin can create staff, reset PIN, deactivate, and reactivate.",
+    listEmpty: "No staff match the current controls",
+  },
+  admin: {
+    activeSection: "admins",
+    title: "Admins",
+    createTitle: "Add Admin",
+    detailTitle: "Admin Detail",
+    eyebrow: "Admin Management",
+    createEyebrow: "Add Admin",
+    detailEyebrow: "Admin Detail",
+    heading: "Create Admin accounts and control Admin access",
+    createHeading: "Create an Admin account with a temporary PIN",
+    badge: "OWNER only",
+    singular: "Admin",
+    plural: "Admins",
+    pluralLower: "admins",
+    directoryLabel: "Admin directory",
+    identityLabel: "Admin identity",
+    photoLabel: "Admin photo",
+    controlsSubtitle: "OWNER-only state changes",
+    managementCopy: "OWNER can create Admins, reset PIN, deactivate, and reactivate.",
+    listEmpty: "No admins match the current controls",
+  },
+};
+
 export function AdminStaffWorkspace({ session }: { readonly session: AdminSessionView }) {
   return (
     <AdminPortalShell activeSection="staff" session={session} subtitle="Admin Web" title="Staff">
-      <StaffDirectory />
+      <StaffDirectory kind="staff" />
+    </AdminPortalShell>
+  );
+}
+
+export function AdminAdminsWorkspace({ session }: { readonly session: AdminSessionView }) {
+  return (
+    <AdminPortalShell activeSection="admins" session={session} subtitle="Admin Web" title="Admins">
+      <StaffDirectory kind="admin" />
     </AdminPortalShell>
   );
 }
@@ -47,7 +124,15 @@ export function AdminStaffWorkspace({ session }: { readonly session: AdminSessio
 export function AdminStaffCreateWorkspace({ session }: { readonly session: AdminSessionView }) {
   return (
     <AdminPortalShell activeSection="staff" session={session} subtitle="Admin Web" title="Add Staff">
-      <StaffCreate />
+      <StaffCreate kind="staff" />
+    </AdminPortalShell>
+  );
+}
+
+export function AdminAdminCreateWorkspace({ session }: { readonly session: AdminSessionView }) {
+  return (
+    <AdminPortalShell activeSection="admins" session={session} subtitle="Admin Web" title="Add Admin">
+      <StaffCreate kind="admin" />
     </AdminPortalShell>
   );
 }
@@ -61,7 +146,21 @@ export function AdminStaffDetailWorkspace({
 }) {
   return (
     <AdminPortalShell activeSection="staff" session={session} subtitle="Admin Web" title="Staff Detail">
-      <StaffDetail staffId={staffId} />
+      <StaffDetail accountId={staffId} kind="staff" />
+    </AdminPortalShell>
+  );
+}
+
+export function AdminAdminDetailWorkspace({
+  session,
+  adminId,
+}: {
+  readonly session: AdminSessionView;
+  readonly adminId: string;
+}) {
+  return (
+    <AdminPortalShell activeSection="admins" session={session} subtitle="Admin Web" title="Admin Detail">
+      <StaffDetail accountId={adminId} kind="admin" />
     </AdminPortalShell>
   );
 }
@@ -74,12 +173,13 @@ export function AdminStaffSelfProfileWorkspace({ session }: { readonly session: 
   );
 }
 
-function StaffDirectory() {
+function StaffDirectory({ kind }: { readonly kind: ManagedAccountKind }) {
+  const copy = managedAccountCopy[kind];
   const [staff, setStaff] = useState<readonly AdminStaffSummary[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StaffFilter>("all");
   const [sort, setSort] = useState<StaffSort>("newest");
-  const [status, setStatus] = useState<StatusState>({ tone: "idle", message: "Loading staff" });
+  const [status, setStatus] = useState<StatusState>({ tone: "idle", message: `Loading ${copy.pluralLower}` });
   const [loading, setLoading] = useState(false);
   const api = useMemo(() => createAdminApiClient(), []);
 
@@ -88,13 +188,13 @@ function StaffDirectory() {
 
     async function loadStaff() {
       setLoading(true);
-      setStatus({ tone: "idle", message: "Loading staff" });
+      setStatus({ tone: "idle", message: `Loading ${copy.pluralLower}` });
 
       try {
-        const response = await api.listStaff();
+        const response = await listManagedAccounts(api, kind);
         if (!cancelled) {
           setStaff(response);
-          setStatus({ tone: "success", message: "Staff loaded" });
+          setStatus({ tone: "success", message: `${copy.plural} loaded` });
         }
       } catch (error) {
         if (!cancelled) {
@@ -112,7 +212,7 @@ function StaffDirectory() {
     return () => {
       cancelled = true;
     };
-  }, [api]);
+  }, [api, kind]);
 
   const visibleStaff = useMemo(() => applyStaffListTools(staff, query, filter, sort), [filter, query, sort, staff]);
   const activeCount = staff.filter((staffMember) => staffMember.status === "ACTIVE").length;
@@ -120,11 +220,11 @@ function StaffDirectory() {
 
   async function refreshStaff() {
     setLoading(true);
-    setStatus({ tone: "idle", message: "Loading staff" });
+    setStatus({ tone: "idle", message: `Loading ${copy.pluralLower}` });
 
     try {
-      setStaff(await api.listStaff());
-      setStatus({ tone: "success", message: "Staff loaded" });
+      setStaff(await listManagedAccounts(api, kind));
+      setStatus({ tone: "success", message: `${copy.plural} loaded` });
     } catch (error) {
       setStatus({ tone: "error", message: getErrorMessage(error) });
     } finally {
@@ -136,32 +236,32 @@ function StaffDirectory() {
     <section className="content">
       <div className="page-intro">
         <div>
-          <div className="eyebrow">Staff Management</div>
-          <h2>Create staff accounts and control OWNER delegated access</h2>
+          <div className="eyebrow">{copy.eyebrow}</div>
+          <h2>{copy.heading}</h2>
         </div>
         <div className="toolbar">
           <span className="badge good">
             <ShieldCheck size={14} aria-hidden="true" />
-            OWNER only
+            {copy.badge}
           </span>
-          <Link className="button primary" href={"/staff/new" as Route}>
+          <Link className="button primary" href={accountCreateHref(kind) as Route}>
             <UserPlus size={16} aria-hidden="true" />
-            Add staff
+            Add {copy.singular.toLowerCase()}
           </Link>
         </div>
       </div>
 
       <div className="summary-grid">
-        <Metric label="Staff" value={String(staff.length)} />
+        <Metric label={copy.plural} value={String(staff.length)} />
         <Metric label="Active" value={String(activeCount)} />
         <Metric label="Deactivated" value={String(deactivatedCount)} />
-        <Metric label="PIN delivery" value="Mock" />
+        <Metric label="PIN sharing" value="Offline" />
       </div>
 
-      <section className="panel" aria-label="Staff directory">
+      <section className="panel" aria-label={copy.directoryLabel}>
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Staff directory</h2>
+            <h2 className="panel-title">{copy.directoryLabel}</h2>
             <div className={status.tone === "error" ? "status error" : "status"}>{status.message}</div>
           </div>
           <button className="button" type="button" onClick={() => void refreshStaff()} disabled={loading}>
@@ -184,7 +284,7 @@ function StaffDirectory() {
           <label className="field">
             <span className="field-label">Filter</span>
             <select className="select-input" value={filter} onChange={(event) => setFilter(event.target.value as StaffFilter)}>
-              <option value="all">All staff</option>
+              <option value="all">All {copy.pluralLower}</option>
               <option value="active">Active</option>
               <option value="deactivated">Deactivated</option>
             </select>
@@ -205,10 +305,10 @@ function StaffDirectory() {
 
         <div className="ledger-list">
           {visibleStaff.length === 0 ? (
-            <div className="panel-empty compact">No staff match the current controls</div>
+            <div className="panel-empty compact">{copy.listEmpty}</div>
           ) : (
             visibleStaff.map((staffMember) => (
-              <Link className="ledger-row" href={`/staff/${staffMember.staffId}` as Route} key={staffMember.staffId}>
+              <Link className="ledger-row" href={accountDetailHref(kind, staffMember.staffId) as Route} key={staffMember.staffId}>
                 <Avatar name={staffMember.name} photoUrl={staffMember.photoUrl} />
                 <div className="ledger-main">
                   <div>
@@ -220,7 +320,7 @@ function StaffDirectory() {
                 <div className="ledger-facts">
                   <span>Created: {formatDate(staffMember.createdAt)}</span>
                   <span>Last opened: {staffMember.lastOpenedAt ? formatDate(staffMember.lastOpenedAt) : "Not recorded"}</span>
-                  <span>Created by: {staffMember.createdByOwnerId ?? "Owner"}</span>
+                  <span>Created by: {staffMember.createdByLabel ?? "OWNER"}</span>
                   <span>Controls: detail page</span>
                 </div>
               </Link>
@@ -232,7 +332,8 @@ function StaffDirectory() {
   );
 }
 
-function StaffCreate() {
+function StaffCreate({ kind }: { readonly kind: ManagedAccountKind }) {
+  const copy = managedAccountCopy[kind];
   const router = useRouter();
   const [form, setForm] = useState<StaffFormState>(emptyForm);
   const [createdStaff, setCreatedStaff] = useState<AdminStaffSummary | null>(null);
@@ -249,10 +350,10 @@ function StaffCreate() {
     setLoading(true);
     setTemporaryPin(null);
     setCreatedStaff(null);
-    setStatus({ tone: "idle", message: "Creating staff" });
+    setStatus({ tone: "idle", message: `Creating ${copy.singular.toLowerCase()}` });
 
     try {
-      const result = await api.createStaff(form);
+      const result = await createManagedAccount(api, kind, form);
       setCreatedStaff(result.staff);
       setTemporaryPin(result.temporaryPin);
       setForm(emptyForm);
@@ -268,24 +369,24 @@ function StaffCreate() {
     <section className="content">
       <div className="page-intro">
         <div>
-          <div className="eyebrow">Add Staff</div>
-          <h2>Create a staff account with a temporary PIN</h2>
+          <div className="eyebrow">{copy.createEyebrow}</div>
+          <h2>{copy.createHeading}</h2>
         </div>
-        <Link className="button" href={"/staff" as Route}>
+        <Link className="button" href={accountDirectoryHref(kind) as Route}>
           <ArrowLeft size={16} aria-hidden="true" />
           Directory
         </Link>
       </div>
 
-      <section className="panel" aria-label="Add staff">
+      <section className="panel" aria-label={`Add ${copy.singular.toLowerCase()}`}>
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Staff identity</h2>
+            <h2 className="panel-title">{copy.identityLabel}</h2>
             <div className={status.tone === "error" ? "status error" : "status"}>{status.message}</div>
           </div>
           <span className="badge good">
             <UserCheck size={14} aria-hidden="true" />
-            OWNER
+            {copy.badge}
           </span>
         </div>
         <div className="form-grid three">
@@ -296,8 +397,8 @@ function StaffCreate() {
             onChange={(value) => setForm((current) => ({ ...current, mobileNumber: value }))}
           />
           <ProfilePhotoUpload
-            label="Staff photo"
-            name={form.name || "Staff"}
+            label={copy.photoLabel}
+            name={form.name || copy.singular}
             photoUrl={form.photoUrl}
             onError={(message) => setStatus({ tone: "error", message })}
             onPhotoChange={(photoUrl) => setForm((current) => ({ ...current, photoUrl }))}
@@ -308,13 +409,13 @@ function StaffCreate() {
             <span>
               {createdStaff.name} PIN <strong className="token">{temporaryPin}</strong>
             </span>
-            <button className="button" type="button" onClick={() => router.push(`/staff/${createdStaff.staffId}` as Route)}>
+            <button className="button" type="button" onClick={() => router.push(accountDetailHref(kind, createdStaff.staffId) as Route)}>
               Open detail
             </button>
           </div>
         ) : null}
         <div className="actions">
-          <span className="status">PIN delivery: mock provider until production SMS is selected</span>
+          <span className="status">Share this temporary PIN offline through the approved operational channel.</span>
           <button
             className="button primary"
             type="button"
@@ -322,7 +423,7 @@ function StaffCreate() {
             disabled={loading || !form.name.trim() || !form.mobileNumber.trim()}
           >
             {loading ? <Loader2 size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
-            Add staff
+            Add {copy.singular.toLowerCase()}
           </button>
         </div>
       </section>
@@ -330,11 +431,12 @@ function StaffCreate() {
   );
 }
 
-function StaffDetail({ staffId }: { readonly staffId: string }) {
+function StaffDetail({ accountId, kind }: { readonly accountId: string; readonly kind: ManagedAccountKind }) {
+  const copy = managedAccountCopy[kind];
   const [staff, setStaff] = useState<AdminStaffSummary | null>(null);
   const [photoDraft, setPhotoDraft] = useState("");
   const [temporaryPin, setTemporaryPin] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusState>({ tone: "idle", message: "Loading staff" });
+  const [status, setStatus] = useState<StatusState>({ tone: "idle", message: `Loading ${copy.singular.toLowerCase()}` });
   const [loading, setLoading] = useState<string | null>(null);
   const api = useMemo(() => createAdminApiClient(), []);
 
@@ -343,10 +445,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
 
     async function loadStaff() {
       setLoading("detail");
-      setStatus({ tone: "idle", message: "Loading staff" });
+      setStatus({ tone: "idle", message: `Loading ${copy.singular.toLowerCase()}` });
 
       try {
-        const response = await api.getStaffDetail(staffId);
+        const response = await getManagedAccount(api, kind, accountId);
         if (!cancelled) {
           setStaff(response);
           setPhotoDraft(response.photoUrl ?? "");
@@ -368,10 +470,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [api, staffId]);
+  }, [accountId, api, kind, copy.singular]);
 
   async function reloadStaff(message: string) {
-    const response = await api.getStaffDetail(staffId);
+    const response = await getManagedAccount(api, kind, accountId);
     setStaff(response);
     setPhotoDraft(response.photoUrl ?? "");
     setStatus({ tone: "success", message });
@@ -383,13 +485,13 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     }
 
     setLoading("photo");
-    setStatus({ tone: "idle", message: "Saving staff photo" });
+    setStatus({ tone: "idle", message: `Saving ${copy.singular.toLowerCase()} photo` });
 
     try {
       const response = await api.updateStaffPhoto(staff.staffId, { photoUrl: photoDraft || null });
       setStaff(response);
       setPhotoDraft(response.photoUrl ?? "");
-      setStatus({ tone: "success", message: "Staff photo saved" });
+      setStatus({ tone: "success", message: `${copy.singular} photo saved` });
     } catch (error) {
       setStatus({ tone: "error", message: getErrorMessage(error) });
     } finally {
@@ -407,7 +509,7 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     setStatus({ tone: "idle", message: "Resetting PIN" });
 
     try {
-      const result = await api.resetStaffPin(staff.staffId);
+      const result = await resetManagedPin(api, kind, staff.staffId);
       setTemporaryPin(result.temporaryPin);
       setStaff(result.staff);
       setStatus({ tone: "success", message: `${result.staff.name} PIN reset` });
@@ -424,10 +526,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     }
 
     setLoading("deactivate");
-    setStatus({ tone: "idle", message: "Deactivating staff" });
+    setStatus({ tone: "idle", message: `Deactivating ${copy.singular.toLowerCase()}` });
 
     try {
-      await api.deactivateStaff(staff.staffId);
+      await deactivateManagedAccount(api, kind, staff.staffId);
       await reloadStaff(`${staff.name} deactivated`);
     } catch (error) {
       setStatus({ tone: "error", message: getErrorMessage(error) });
@@ -442,10 +544,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     }
 
     setLoading("reactivate");
-    setStatus({ tone: "idle", message: "Reactivating staff" });
+    setStatus({ tone: "idle", message: `Reactivating ${copy.singular.toLowerCase()}` });
 
     try {
-      await api.reactivateStaff(staff.staffId);
+      await reactivateManagedAccount(api, kind, staff.staffId);
       await reloadStaff(`${staff.name} reactivated`);
     } catch (error) {
       setStatus({ tone: "error", message: getErrorMessage(error) });
@@ -458,10 +560,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
     <section className="content">
       <div className="page-intro">
         <div>
-          <div className="eyebrow">Staff Detail</div>
-          <h2>{staff?.name ?? "Loading staff"}</h2>
+          <div className="eyebrow">{copy.detailEyebrow}</div>
+          <h2>{staff?.name ?? `Loading ${copy.singular.toLowerCase()}`}</h2>
         </div>
-        <Link className="button" href={"/staff" as Route}>
+        <Link className="button" href={accountDirectoryHref(kind) as Route}>
           <ArrowLeft size={16} aria-hidden="true" />
           Directory
         </Link>
@@ -476,10 +578,10 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
         </section>
       ) : (
         <div className="workspace">
-          <section className="panel" aria-label="Staff identity">
+          <section className="panel" aria-label={copy.identityLabel}>
             <div className="panel-header">
               <div>
-                <h2 className="panel-title">Staff identity</h2>
+                <h2 className="panel-title">{copy.identityLabel}</h2>
                 <div className={status.tone === "error" ? "status error" : "status"}>{status.message}</div>
               </div>
               <span className={`badge ${staff.status === "ACTIVE" ? "good" : "warn"}`}>{staff.status}</span>
@@ -496,20 +598,20 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
               <Metric label="Mobile" value={staff.mobileNumber} />
               <Metric label="Created" value={formatDate(staff.createdAt)} />
               <Metric label="Last opened" value={staff.lastOpenedAt ? formatDate(staff.lastOpenedAt) : "Not recorded"} />
-              <Metric label="Created by" value={staff.createdByOwnerId ?? "Owner"} />
+              <Metric label="Created by" value={staff.createdByLabel ?? "OWNER"} />
               <Metric label="Status" value={staff.status} />
             </div>
             <div className="detail-action-copy">
-              <strong>Staff mobile edits are deferred</strong>
-              <span>For this slice, OWNER can create staff, reset PIN, deactivate, and reactivate.</span>
+              <strong>{copy.singular} mobile edits are deferred</strong>
+              <span>{copy.managementCopy}</span>
             </div>
           </section>
 
-          <section className="panel" aria-label="Staff controls">
+          <section className="panel" aria-label={`${copy.singular} controls`}>
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Access controls</h2>
-                <div className="panel-subtitle">OWNER-only state changes</div>
+                <div className="panel-subtitle">{copy.controlsSubtitle}</div>
               </div>
               <span className="badge good">
                 <ShieldCheck size={14} aria-hidden="true" />
@@ -528,7 +630,7 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
               {temporaryPin ? <span className="token">New PIN {temporaryPin}</span> : null}
             </div>
             <div className="actions danger-zone">
-              <span className="status">Deactivate staff when access should be removed.</span>
+              <span className="status">Deactivate {copy.singular.toLowerCase()} when access should be removed.</span>
               {staff.status === "ACTIVE" ? (
                 <button className="button danger" type="button" onClick={() => void deactivateStaff()} disabled={loading !== null}>
                   {loading === "deactivate" ? <Loader2 size={16} aria-hidden="true" /> : <UserX size={16} aria-hidden="true" />}
@@ -543,17 +645,18 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
             </div>
           </section>
 
-          <section className="panel" aria-label="Staff photo">
+          {kind === "staff" ? (
+            <section className="panel" aria-label={copy.photoLabel}>
             <div className="panel-header">
               <div>
-                <h2 className="panel-title">Staff photo</h2>
-                <div className="panel-subtitle">OWNER can update staff profile media</div>
+                <h2 className="panel-title">{copy.photoLabel}</h2>
+                <div className="panel-subtitle">OWNER/Admin can update staff profile media</div>
               </div>
-              <span className="badge good">OWNER</span>
+              <span className="badge good">OWNER / ADMIN</span>
             </div>
             <div className="form-grid">
               <ProfilePhotoUpload
-                label="Staff photo"
+                label={copy.photoLabel}
                 name={staff.name}
                 photoUrl={photoDraft}
                 onError={(message) => setStatus({ tone: "error", message })}
@@ -568,6 +671,7 @@ function StaffDetail({ staffId }: { readonly staffId: string }) {
               </button>
             </div>
           </section>
+          ) : null}
         </div>
       )}
     </section>
@@ -633,16 +737,18 @@ function StaffSelfProfile() {
     }
   }
 
+  const accountLabel = staff?.role === "ADMIN" ? "Admin" : "Staff";
+
   return (
     <section className="content">
       <div className="page-intro">
         <div>
           <div className="eyebrow">My Profile</div>
-          <h2>{staff?.name ?? "Staff profile"}</h2>
+          <h2>{staff?.name ?? "Profile"}</h2>
         </div>
         <span className="badge good">
           <ShieldCheck size={14} aria-hidden="true" />
-          STAFF self-service
+          {staff?.role ?? "STAFF"} self-service
         </span>
       </div>
 
@@ -655,10 +761,10 @@ function StaffSelfProfile() {
         </section>
       ) : (
         <div className="workspace">
-          <section className="panel" aria-label="My staff identity">
+          <section className="panel" aria-label={`My ${accountLabel.toLowerCase()} identity`}>
             <div className="panel-header">
               <div>
-                <h2 className="panel-title">Staff identity</h2>
+                <h2 className="panel-title">{accountLabel} identity</h2>
                 <div className={status.tone === "error" ? "status error" : "status"}>{status.message}</div>
               </div>
               <span className={`badge ${staff.status === "ACTIVE" ? "good" : "warn"}`}>{staff.status}</span>
@@ -682,7 +788,7 @@ function StaffSelfProfile() {
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Profile photo</h2>
-                <div className="panel-subtitle">Only your own staff photo can be changed here</div>
+                <div className="panel-subtitle">Only your own profile photo can be changed here</div>
               </div>
               <span className="badge good">Self</span>
             </div>
@@ -696,7 +802,7 @@ function StaffSelfProfile() {
               />
             </div>
             <div className="actions">
-              <span className="status">Staff management remains OWNER-only.</span>
+              <span className="status">{accountLabel} management remains separately permissioned.</span>
               <button className="button primary" type="button" onClick={() => void savePhoto()} disabled={loading}>
                 {loading ? <Loader2 size={16} aria-hidden="true" /> : <UserCheck size={16} aria-hidden="true" />}
                 Save photo
@@ -744,6 +850,50 @@ function applyStaffListTools(
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     }
   });
+}
+
+function accountDirectoryHref(kind: ManagedAccountKind): string {
+  return kind === "admin" ? "/admins" : "/staff";
+}
+
+function accountCreateHref(kind: ManagedAccountKind): string {
+  return kind === "admin" ? "/admins/new" : "/staff/new";
+}
+
+function accountDetailHref(kind: ManagedAccountKind, accountId: string): string {
+  return kind === "admin" ? `/admins/${accountId}` : `/staff/${accountId}`;
+}
+
+function listManagedAccounts(api: AdminApiClient, kind: ManagedAccountKind): Promise<readonly AdminStaffSummary[]> {
+  return kind === "admin" ? api.listAdmins() : api.listStaff();
+}
+
+function getManagedAccount(api: AdminApiClient, kind: ManagedAccountKind, accountId: string): Promise<AdminStaffSummary> {
+  return kind === "admin" ? api.getAdminDetail(accountId) : api.getStaffDetail(accountId);
+}
+
+function createManagedAccount(
+  api: AdminApiClient,
+  kind: ManagedAccountKind,
+  form: StaffFormState,
+): Promise<{ readonly staff: AdminStaffSummary; readonly temporaryPin: string }> {
+  return kind === "admin" ? api.createAdmin(form) : api.createStaff(form);
+}
+
+function resetManagedPin(
+  api: AdminApiClient,
+  kind: ManagedAccountKind,
+  accountId: string,
+): Promise<{ readonly staff: AdminStaffSummary; readonly temporaryPin: string }> {
+  return kind === "admin" ? api.resetAdminPin(accountId) : api.resetStaffPin(accountId);
+}
+
+function deactivateManagedAccount(api: AdminApiClient, kind: ManagedAccountKind, accountId: string): Promise<AdminStaffSummary> {
+  return kind === "admin" ? api.deactivateAdmin(accountId) : api.deactivateStaff(accountId);
+}
+
+function reactivateManagedAccount(api: AdminApiClient, kind: ManagedAccountKind, accountId: string): Promise<AdminStaffSummary> {
+  return kind === "admin" ? api.reactivateAdmin(accountId) : api.reactivateStaff(accountId);
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string }) {

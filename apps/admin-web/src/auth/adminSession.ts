@@ -47,6 +47,8 @@ export async function requireAdminSession(options: {
 
   const session: AdminSessionView = {
     role: dashboard.data.actorRole,
+    ...(dashboard.data.actorName ? { actorName: dashboard.data.actorName } : {}),
+    actorLabel: dashboard.data.actorLabel,
     roleLabel: dashboard.data.roleLabel,
     allowedSections: dashboard.data.allowedSections,
   };

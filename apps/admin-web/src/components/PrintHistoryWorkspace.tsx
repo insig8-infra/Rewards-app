@@ -9,7 +9,7 @@ import type { AdminSessionView } from "../auth/adminSessionTypes";
 import { AdminPortalShell } from "./AdminPortalShell";
 
 type HistoryFilter = "all" | "today" | "last7" | "high-volume";
-type ActorFilter = "all" | "OWNER" | "STAFF";
+type ActorFilter = "all" | "OWNER" | "ADMIN" | "STAFF";
 type HistorySort = "printed-desc" | "invoice-number" | "units-desc" | "actor";
 
 export function PrintHistoryWorkspace({ session }: { readonly session: AdminSessionView }) {
@@ -118,6 +118,7 @@ function PrintHistoryContent() {
           >
             <option value="all">All actors</option>
             <option value="OWNER">Owner</option>
+            <option value="ADMIN">Admin</option>
             <option value="STAFF">Staff</option>
           </select>
           <select

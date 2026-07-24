@@ -23,13 +23,27 @@ export class AdminStaffService {
     return this.repository.listStaff();
   }
 
+  async listAdmins(actor: AuthenticatedActor): Promise<readonly AdminStaffSummary[]> {
+    assertOwnerCanManageAdmins(actor);
+    return this.repository.listAdmins();
+  }
+
   getStaff(staffId: string): Promise<AdminStaffSummary> {
     return this.getStaffOrThrow(staffId);
   }
 
+  async getAdmin(adminId: string, actor: AuthenticatedActor): Promise<AdminStaffSummary> {
+    assertOwnerCanManageAdmins(actor);
+    const admin = await this.repository.getAdmin(adminId);
+    if (!admin) {
+      throw new NotFoundException("Admin account was not found.");
+    }
+    return admin;
+  }
+
   async getMyStaff(actor: AuthenticatedActor): Promise<AdminStaffSummary> {
     if (!actor.userId) {
-      throw new ForbiddenException("A staff user session is required.");
+      throw new ForbiddenException("An admin or staff user session is required.");
     }
 
     const staff = await this.repository.getStaffByUserId(actor.userId);
@@ -57,6 +71,25 @@ export class AdminStaffService {
     return { staff, temporaryPin };
   }
 
+  async createAdmin(
+    input: AdminStaffWriteInput,
+    actor: AuthenticatedActor,
+    now = new Date(),
+  ): Promise<AdminStaffMutationResult> {
+    assertOwnerCanManageAdmins(actor);
+    const normalized = normalizeOrBadRequest(input);
+    const existing = await this.repository.findMobileRegistration(normalized.mobileNumber);
+    if (existing) {
+      throw duplicateMobileConflict(existing.staff);
+    }
+
+    const temporaryPin = this.generateTemporaryPin();
+    assertPinOrBadRequest(temporaryPin);
+    const staff = await this.repository.createAdmin(normalized, hashStaffPin(temporaryPin), actor, now);
+
+    return { staff, temporaryPin };
+  }
+
   async updateStaffPhoto(
     staffId: string,
     input: AdminStaffPhotoInput,
@@ -64,11 +97,20 @@ export class AdminStaffService {
     now = new Date(),
   ): Promise<AdminStaffSummary> {
     const current = await this.getStaffOrThrow(staffId);
-    if (actor.role !== ACTOR_ROLE.OWNER && current.userId !== actor.userId) {
+    if (!canManageStaffAccounts(actor.role) && current.userId !== actor.userId) {
       throw new ForbiddenException("Staff can update only their own photo.");
     }
 
     return this.repository.updateStaffPhoto(staffId, normalizePhotoUrl(input.photoUrl), actor, now);
+  }
+
+  async updateMyStaffPhoto(
+    input: AdminStaffPhotoInput,
+    actor: AuthenticatedActor,
+    now = new Date(),
+  ): Promise<AdminStaffSummary> {
+    const current = await this.getMyStaff(actor);
+    return this.repository.updateStaffPhoto(current.staffId, normalizePhotoUrl(input.photoUrl), actor, now);
   }
 
   async resetStaffPin(
@@ -106,6 +148,44 @@ export class AdminStaffService {
     return this.repository.reactivateStaff(staffId, actor, now);
   }
 
+  async resetAdminPin(
+    adminId: string,
+    actor: AuthenticatedActor,
+    now = new Date(),
+  ): Promise<AdminStaffMutationResult> {
+    assertOwnerCanManageAdmins(actor);
+    const current = await this.getAdmin(adminId, actor);
+    if (current.status !== "ACTIVE") {
+      throw new BadRequestException("Reactivate admin before resetting PIN.");
+    }
+
+    const temporaryPin = this.generateTemporaryPin();
+    assertPinOrBadRequest(temporaryPin);
+    const staff = await this.repository.resetAdminPin(adminId, hashStaffPin(temporaryPin), actor, now);
+
+    return { staff, temporaryPin };
+  }
+
+  async deactivateAdmin(adminId: string, actor: AuthenticatedActor, now = new Date()): Promise<AdminStaffSummary> {
+    assertOwnerCanManageAdmins(actor);
+    const current = await this.getAdmin(adminId, actor);
+    if (current.status === "DEACTIVATED") {
+      throw new BadRequestException("Admin is already deactivated.");
+    }
+
+    return this.repository.deactivateAdmin(adminId, actor, now);
+  }
+
+  async reactivateAdmin(adminId: string, actor: AuthenticatedActor, now = new Date()): Promise<AdminStaffSummary> {
+    assertOwnerCanManageAdmins(actor);
+    const current = await this.getAdmin(adminId, actor);
+    if (current.status === "ACTIVE") {
+      throw new BadRequestException("Admin is already active.");
+    }
+
+    return this.repository.reactivateAdmin(adminId, actor, now);
+  }
+
   private async getStaffOrThrow(staffId: string): Promise<AdminStaffSummary> {
     const staff = await this.repository.getStaff(staffId);
     if (!staff) {
@@ -116,6 +196,16 @@ export class AdminStaffService {
 
   protected generateTemporaryPin(): string {
     return generateStaffPin();
+  }
+}
+
+function canManageStaffAccounts(role: AuthenticatedActor["role"]): boolean {
+  return role === ACTOR_ROLE.OWNER || role === ACTOR_ROLE.ADMIN;
+}
+
+function assertOwnerCanManageAdmins(actor: AuthenticatedActor): void {
+  if (actor.role !== ACTOR_ROLE.OWNER) {
+    throw new ForbiddenException("Only OWNER can manage Admin accounts.");
   }
 }
 

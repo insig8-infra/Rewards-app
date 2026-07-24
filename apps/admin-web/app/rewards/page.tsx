@@ -2,7 +2,7 @@ import { AdminRewardsWorkspace } from "../../src/components/AdminRewardsWorkspac
 import { requireAdminSession } from "../../src/auth/adminSession";
 
 export default async function RewardsPage() {
-  const session = await requireAdminSession({ allowedRoles: ["OWNER", "STAFF"], loginRedirectTo: "/rewards" });
+  const session = await requireAdminSession({ allowedRoles: ["OWNER", "ADMIN", "STAFF"], loginRedirectTo: "/rewards" });
 
   return <AdminRewardsWorkspace session={session} />;
 }

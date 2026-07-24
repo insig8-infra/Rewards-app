@@ -31,8 +31,8 @@ export function assertCanPrintQr(
   selections: readonly QrPrintLineRequest[],
   availabilities: readonly QrPrintLineAvailability[],
 ): void {
-  if (actorRole !== ACTOR_ROLE.OWNER && actorRole !== ACTOR_ROLE.STAFF) {
-    throw new DomainError("QR_PRINT_FORBIDDEN_ACTOR", "Only OWNER or STAFF can print QR codes.");
+  if (actorRole !== ACTOR_ROLE.OWNER && actorRole !== ACTOR_ROLE.ADMIN && actorRole !== ACTOR_ROLE.STAFF) {
+    throw new DomainError("QR_PRINT_FORBIDDEN_ACTOR", "Only OWNER, ADMIN, or STAFF can print QR codes.");
   }
 
   if (selections.length === 0) {

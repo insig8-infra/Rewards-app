@@ -19,7 +19,7 @@ export type AdminReportRangePreset =
   | "last-3-months"
   | "custom";
 
-export type AdminReportExportFormat = "PDF" | "EXCEL";
+export type AdminReportExportFormat = "PDF" | "EXCEL" | "CSV";
 
 export type AdminReportCell = string | number | boolean | null;
 

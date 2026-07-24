@@ -1,4 +1,5 @@
 import type { ActorRole } from "@volt-rewards/domain";
+import type { AuthenticatedActor } from "../auth/authenticated-actor.js";
 
 export const ADMIN_WEB_DASHBOARD_REPOSITORY = Symbol("ADMIN_WEB_DASHBOARD_REPOSITORY");
 
@@ -62,6 +63,8 @@ export interface AdminWebDashboardTopContractor {
 
 export interface AdminWebDashboard {
   readonly actorRole: ActorRole;
+  readonly actorName?: string;
+  readonly actorLabel: string;
   readonly roleLabel: string;
   readonly allowedSections: readonly string[];
   readonly metrics: {
@@ -88,5 +91,5 @@ export interface AdminWebDashboard {
 }
 
 export interface AdminWebDashboardRepository {
-  getDashboard(actorRole: ActorRole): Promise<AdminWebDashboard>;
+  getDashboard(actor: AuthenticatedActor): Promise<AdminWebDashboard>;
 }

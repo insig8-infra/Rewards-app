@@ -2,15 +2,9 @@ import type { ActorRole } from "@volt-rewards/domain";
 
 export const ADMIN_WEB_INVOICE_READ_REPOSITORY = Symbol("ADMIN_WEB_INVOICE_READ_REPOSITORY");
 
-export interface AdminWebInvoiceParty {
+export interface AdminWebInvoiceCustomer {
   readonly name: string;
-  readonly gstin?: string;
-  readonly addressLine1: string;
-  readonly addressLine2?: string;
-  readonly city: string;
-  readonly state: string;
-  readonly pincode: string;
-  readonly phone?: string;
+  readonly state?: string;
 }
 
 export interface AdminWebInvoiceSummary {
@@ -20,7 +14,6 @@ export interface AdminWebInvoiceSummary {
   readonly invoiceDate: Date;
   readonly importedAt: Date;
   readonly customerName: string;
-  readonly customerGstin?: string;
   readonly gstTotal: string;
   readonly finalTotal: string;
   readonly lineCount: number;
@@ -42,11 +35,10 @@ export interface AdminWebInvoiceSummary {
 export interface AdminWebInvoiceLine {
   readonly invoiceLineId: string;
   readonly externalLineId: string;
+  readonly sourceLineNo: string;
   readonly sku: string;
   readonly productName: string;
-  readonly brand?: string;
   readonly category?: string;
-  readonly hsnCode?: string;
   readonly unit: string;
   readonly quantity: number;
   readonly returnedQty: number;
@@ -58,11 +50,6 @@ export interface AdminWebInvoiceLine {
   readonly printableQuantity: number;
   readonly pointsPerUnit: number;
   readonly unitRate: string;
-  readonly taxableValue: string;
-  readonly gstRatePercent: string;
-  readonly cgstAmount: string;
-  readonly sgstAmount: string;
-  readonly igstAmount: string;
   readonly lineTotal: string;
   readonly qrUnits: readonly AdminWebInvoiceQrUnit[];
 }
@@ -108,21 +95,7 @@ export interface AdminWebInvoicePrintHistory {
 }
 
 export interface AdminWebInvoiceDetail extends AdminWebInvoiceSummary {
-  readonly seller: AdminWebInvoiceParty;
-  readonly customer: AdminWebInvoiceParty;
-  readonly placeOfSupply: string;
-  readonly paymentTerms?: string;
-  readonly paymentMode?: string;
-  readonly salesPerson?: string;
-  readonly taxableSubtotal: string;
-  readonly discountTotal: string;
-  readonly freightTotal: string;
-  readonly cgstTotal: string;
-  readonly sgstTotal: string;
-  readonly igstTotal: string;
-  readonly totalAmount: string;
-  readonly roundOff: string;
-  readonly amountInWords?: string;
+  readonly customer: AdminWebInvoiceCustomer;
   readonly lines: readonly AdminWebInvoiceLine[];
   readonly returnHistory: readonly AdminWebInvoiceReturnHistory[];
   readonly printHistory: readonly AdminWebInvoicePrintHistory[];

@@ -127,25 +127,19 @@ function InvoiceDetailContent({ invoiceId }: { readonly invoiceId: string }) {
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">{invoice.customer.name}</h2>
-                <div className="panel-subtitle">
-                  {invoice.customer.gstin ? `GSTIN ${invoice.customer.gstin}` : "Customer GSTIN unavailable"}
-                </div>
+                <div className="panel-subtitle">BUSY invoice metadata from confirmed voucher fields</div>
               </div>
               <span className="badge">{invoice.status}</span>
             </div>
             <div className="detail-grid invoice-detail-grid">
               <Fact label="Invoice date" value={formatDateTime(invoice.invoiceDate)} />
               <Fact label="Imported" value={formatDateTime(invoice.importedAt)} />
-              <Fact label="Seller" value={invoice.seller.name} />
-              <Fact label="Place of supply" value={invoice.placeOfSupply || "-"} />
-              <Fact label="Payment mode" value={invoice.paymentMode ?? "-"} />
-              <Fact label="Sales person" value={invoice.salesPerson ?? "-"} />
-              <Fact label="GST total" value={`INR ${invoice.gstTotal}`} />
-              <Fact label="Taxable" value={`INR ${invoice.taxableSubtotal}`} />
-              <Fact label="CGST" value={`INR ${invoice.cgstTotal}`} />
-              <Fact label="SGST" value={`INR ${invoice.sgstTotal}`} />
-              <Fact label="Round off" value={`INR ${invoice.roundOff}`} />
-              <Fact label="Amount words" value={invoice.amountInWords ?? "-"} />
+              <Fact label="BUSY tmpVchCode" value={invoice.externalInvoiceId} />
+              <Fact label="Billing invoice no." value={invoice.invoiceNumber} />
+              <Fact label="Party" value={invoice.customer.name} />
+              <Fact label="Party state" value={invoice.customer.state ?? "-"} />
+              <Fact label="Total quantity" value={String(invoice.qrUnitCount)} />
+              <Fact label="Total amount" value={`INR ${invoice.finalTotal}`} />
             </div>
           </section>
 
@@ -176,9 +170,8 @@ function InvoiceDetailContent({ invoiceId }: { readonly invoiceId: string }) {
                       <td className="data-table-primary">
                         <strong>{line.productName}</strong>
                         <span>
-                          {line.sku} · {line.category ?? "Electrical"} · {line.unit}
+                          {line.sku} · Sr.No {line.sourceLineNo} · {line.category ?? "No group"} · {line.unit}
                         </span>
-                        {line.hsnCode ? <span>HSN {line.hsnCode}</span> : null}
                       </td>
                       <td className="number-cell">{line.quantity}</td>
                       <td className={line.returnedQty > 0 ? "number-cell warn-cell" : "number-cell"}>{line.returnedQty}</td>
@@ -189,8 +182,7 @@ function InvoiceDetailContent({ invoiceId }: { readonly invoiceId: string }) {
                       <td className="number-cell">{line.pointsPerUnit} pts/unit</td>
                       <td className="amount-cell">
                         <strong>INR {line.lineTotal}</strong>
-                        <span>Rate INR {line.unitRate}</span>
-                        <span>GST {line.gstRatePercent}%</span>
+                        <span>Price INR {line.unitRate}</span>
                       </td>
                     </tr>
                   ))}
@@ -322,32 +314,6 @@ function InvoiceDetailContent({ invoiceId }: { readonly invoiceId: string }) {
               </div>
             </section>
 
-            <section className="panel" aria-label="Next action">
-              <div className="panel-header">
-                <div>
-                  <h2 className="panel-title">Next action</h2>
-                  <div className="panel-subtitle">Admin Web does not cancel or reverse returned-product QR</div>
-                </div>
-              </div>
-              <div className="detail-action-copy">
-                {invoice.printableUnitCount > 0 ? (
-                  <>
-                    <strong>{invoice.printableUnitCount} units can still be printed.</strong>
-                    <span>Open the QR Print Queue to print remaining non-returned units.</span>
-                  </>
-                ) : invoice.status === "CANCELLED" ? (
-                  <>
-                    <strong>Invoice is cancelled.</strong>
-                    <span>No QR printing action is available from Admin Web.</span>
-                  </>
-                ) : (
-                  <>
-                    <strong>No printable units remain.</strong>
-                    <span>Printing is complete or blocked by linked returns.</span>
-                  </>
-                )}
-              </div>
-            </section>
           </div>
         </>
       )}

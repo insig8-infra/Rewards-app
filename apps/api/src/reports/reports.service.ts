@@ -4,7 +4,7 @@ import {
   ADMIN_WEB_REPORTS_REPOSITORY,
   type AdminWebReportsRepository,
 } from "./admin-web-reports.repository.js";
-import { createReportPdf, createReportXlsx } from "./report-file-generators.js";
+import { createReportCsv, createReportPdf, createReportXlsx } from "./report-file-generators.js";
 import type {
   AdminReportExportFile,
   AdminReportExportFormat,
@@ -48,7 +48,7 @@ export class ReportsService {
       pageSize: 10_000,
     });
 
-    const buffer = format === "PDF" ? createReportPdf(report) : createReportXlsx(report);
+    const buffer = format === "PDF" ? createReportPdf(report) : format === "CSV" ? createReportCsv(report) : createReportXlsx(report);
     await this.reports.recordExport({
       actor: {
         role: input.actor.role,
@@ -58,12 +58,14 @@ export class ReportsService {
       report,
     });
 
-    const extension = format === "PDF" ? "pdf" : "xlsx";
+    const extension = format === "PDF" ? "pdf" : format === "CSV" ? "csv" : "xlsx";
     return {
       fileName: `${report.reportId}-${new Date().toISOString().slice(0, 10)}.${extension}`,
       contentType:
         format === "PDF"
           ? "application/pdf"
+          : format === "CSV"
+            ? "text/csv; charset=utf-8"
           : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer,
     };
@@ -79,8 +81,8 @@ function parseReportId(value: string): AdminReportId {
 
 function parseExportFormat(value: string | undefined): AdminReportExportFormat {
   const normalized = value?.toUpperCase();
-  if (normalized === "PDF" || normalized === "EXCEL") {
+  if (normalized === "PDF" || normalized === "EXCEL" || normalized === "CSV") {
     return normalized;
   }
-  throw new BadRequestException("Export format must be PDF or EXCEL.");
+  throw new BadRequestException("Export format must be PDF, CSV, or EXCEL.");
 }

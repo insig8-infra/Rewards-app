@@ -6,6 +6,7 @@ import type { AdminStaffRepository, AdminStaffSummary, AdminStaffWriteInput } fr
 import { AdminStaffService } from "./admin-staff.service.js";
 
 const ownerActor: AuthenticatedActor = { role: "OWNER", userId: "owner_user_1" };
+const adminActor: AuthenticatedActor = { role: "ADMIN", userId: "admin_user_1" };
 const staffActor: AuthenticatedActor = { role: "STAFF", userId: "user_1" };
 const otherStaffActor: AuthenticatedActor = { role: "STAFF", userId: "other_user" };
 const existingStaff = makeStaff({
@@ -139,15 +140,91 @@ test("AdminStaffService updates staff photos for OWNER or self only", async () =
   });
 
   await service.updateStaffPhoto("staff_existing", { photoUrl: " data:image/jpeg;base64,staff " }, ownerActor);
+  await service.updateStaffPhoto("staff_existing", { photoUrl: "data:image/png;base64,admin" }, adminActor);
   await service.updateStaffPhoto("staff_existing", { photoUrl: "" }, staffActor);
 
   assert.deepEqual(seenUpdates, [
     { staffId: "staff_existing", photoUrl: "data:image/jpeg;base64,staff" },
+    { staffId: "staff_existing", photoUrl: "data:image/png;base64,admin" },
     { staffId: "staff_existing", photoUrl: null },
   ]);
 
   await assert.rejects(
     service.updateStaffPhoto("staff_existing", { photoUrl: "data:image/jpeg;base64,blocked" }, otherStaffActor),
+    (error) => error instanceof ForbiddenException,
+  );
+});
+
+test("AdminStaffService updates own profile photo for ADMIN and STAFF sessions", async () => {
+  const adminAccount = makeStaff({
+    staffId: "admin_1",
+    userId: "admin_user_1",
+    role: "ADMIN",
+    name: "Rohit Iyer",
+  });
+  const seenUpdates: Array<{ readonly staffId: string; readonly photoUrl: string | null; readonly actorRole: string }> = [];
+  const service = makeService({
+    getStaffByUserId: (userId) => Promise.resolve(userId === "admin_user_1" ? adminAccount : existingStaff),
+    updateStaffPhoto: (staffId, photoUrl, actor) => {
+      seenUpdates.push({ staffId, photoUrl, actorRole: actor.role });
+      return Promise.resolve(staffId === "admin_1" ? makeStaff({ ...adminAccount, ...(photoUrl ? { photoUrl } : {}) }) : existingStaff);
+    },
+  });
+
+  const updatedAdmin = await service.updateMyStaffPhoto({ photoUrl: " data:image/png;base64,admin " }, adminActor);
+  const updatedStaff = await service.updateMyStaffPhoto({ photoUrl: "" }, staffActor);
+
+  assert.equal(updatedAdmin.role, "ADMIN");
+  assert.deepEqual(seenUpdates, [
+    { staffId: "admin_1", photoUrl: "data:image/png;base64,admin", actorRole: "ADMIN" },
+    { staffId: "staff_existing", photoUrl: null, actorRole: "STAFF" },
+  ]);
+  assert.equal(updatedStaff.role, "STAFF");
+});
+
+test("AdminStaffService lets OWNER manage Admin accounts and blocks ADMIN from Admin management", async () => {
+  const adminAccount = makeStaff({
+    staffId: "admin_1",
+    userId: "admin_user_1",
+    role: "ADMIN",
+    name: "Rohit Iyer",
+    mobileNumber: "9000000093",
+  });
+  const deactivatedAdmin = makeStaff({
+    ...adminAccount,
+    staffId: "inactive_admin",
+    status: "DEACTIVATED",
+    deactivatedAt: new Date("2026-07-10T00:00:00.000Z"),
+  });
+  const createdAdmins: Array<{ readonly input: AdminStaffWriteInput; readonly pinHash: string }> = [];
+  const service = makeService({
+    listAdmins: () => Promise.resolve([adminAccount]),
+    getAdmin: (adminId) => Promise.resolve(adminId === "inactive_admin" ? deactivatedAdmin : adminAccount),
+    findMobileRegistration: () => Promise.resolve(null),
+    createAdmin: (input, pinHash) => {
+      createdAdmins.push({ input, pinHash });
+      return Promise.resolve(makeStaff({ ...adminAccount, name: input.name, mobileNumber: input.mobileNumber }));
+    },
+    resetAdminPin: () => Promise.resolve(adminAccount),
+    deactivateAdmin: () => Promise.resolve(makeStaff({ ...adminAccount, status: "DEACTIVATED" })),
+    reactivateAdmin: () => Promise.resolve(adminAccount),
+  });
+
+  assert.deepEqual((await service.listAdmins(ownerActor)).map((account) => account.role), ["ADMIN"]);
+  const created = await service.createAdmin({ name: "  Rohit   Iyer ", mobileNumber: "+91 90000 00093" }, ownerActor);
+  assert.equal(created.temporaryPin, "4821");
+  assert.equal(created.staff.role, "ADMIN");
+  assert.deepEqual(createdAdmins.map((item) => item.input), [{ name: "Rohit Iyer", mobileNumber: "9000000093" }]);
+  assert.equal((await service.resetAdminPin("admin_1", ownerActor)).temporaryPin, "4821");
+  assert.equal((await service.deactivateAdmin("admin_1", ownerActor)).status, "DEACTIVATED");
+  assert.equal((await service.reactivateAdmin("inactive_admin", ownerActor)).status, "ACTIVE");
+
+  await assert.rejects(
+    () => service.listAdmins(adminActor),
+    (error) => error instanceof ForbiddenException,
+  );
+  await assert.rejects(
+    service.createAdmin({ name: "Blocked Admin", mobileNumber: "9000000094" }, adminActor),
     (error) => error instanceof ForbiddenException,
   );
 });
@@ -161,14 +238,20 @@ function makeService(repository: Partial<AdminStaffRepository>): AdminStaffServi
 
   return new TestAdminStaffService({
     listStaff: () => Promise.resolve([]),
+    listAdmins: () => Promise.resolve([]),
     getStaff: () => Promise.resolve(existingStaff),
+    getAdmin: () => Promise.resolve(null),
     getStaffByUserId: (userId) => Promise.resolve(userId === existingStaff.userId ? existingStaff : null),
     findMobileRegistration: () => Promise.resolve(null),
     createStaff: () => Promise.resolve(existingStaff),
+    createAdmin: () => Promise.resolve(makeStaff({ role: "ADMIN" })),
     updateStaffPhoto: () => Promise.resolve(existingStaff),
     resetStaffPin: () => Promise.resolve(existingStaff),
     deactivateStaff: () => Promise.resolve(existingStaff),
     reactivateStaff: () => Promise.resolve(existingStaff),
+    resetAdminPin: () => Promise.resolve(makeStaff({ role: "ADMIN" })),
+    deactivateAdmin: () => Promise.resolve(makeStaff({ role: "ADMIN", status: "DEACTIVATED" })),
+    reactivateAdmin: () => Promise.resolve(makeStaff({ role: "ADMIN" })),
     ...repository,
   });
 }
@@ -177,6 +260,7 @@ function makeStaff(overrides: Partial<AdminStaffSummary> = {}): AdminStaffSummar
   return {
     staffId: "staff_1",
     userId: "user_1",
+    role: "STAFF",
     name: "Priya Sharma",
     mobileNumber: "9876543210",
     status: "ACTIVE",

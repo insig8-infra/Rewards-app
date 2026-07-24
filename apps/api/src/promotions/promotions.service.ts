@@ -29,6 +29,7 @@ export interface PromotionWriteInput {
   readonly assetAltText?: string | null;
   readonly assetUpload?: PromotionAssetInput;
   readonly overlayText?: string | null;
+  readonly backgroundColor?: string;
   readonly overlayTextColor?: string;
   readonly overlayFontSize?: number;
   readonly overlayFontFamily?: PromotionFontFamily;
@@ -46,6 +47,7 @@ export interface AdminPromotionView {
   readonly assetUrl?: string;
   readonly assetAltText?: string;
   readonly overlayText?: string;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: number;
   readonly overlayFontFamily: PromotionFontFamily;
@@ -74,6 +76,7 @@ const promotionFontFamilies = new Set<PromotionFontFamily>([
 const promotionTitleMaxLength = 80;
 const promotionBodyMaxLength = 180;
 const promotionOverlayMaxLength = 60;
+const defaultPromotionBackgroundColor = "#00535B";
 const minOverlayFontSize = 14;
 const maxOverlayFontSize = 42;
 
@@ -91,6 +94,10 @@ export class PromotionsService {
   async createPromotion(actor: AuthenticatedActor, input: PromotionWriteInput, now = new Date()): Promise<AdminPromotionView> {
     assertAllUserTarget(input.targetPersona);
     const parsed = parsePromotionWriteInput(input, { requireTitle: true });
+    assertPromotionMode({
+      assetUrl: input.assetUpload ? "pending-upload" : parsed.assetUrl ?? null,
+      overlayText: parsed.overlayText ?? null,
+    });
     const desiredStatus = input.status ?? "DRAFT";
     const created = await this.prisma.promotion.create({
       data: {
@@ -99,6 +106,7 @@ export class PromotionsService {
         assetUrl: parsed.assetUrl ?? null,
         assetAltText: parsed.assetAltText ?? null,
         overlayText: parsed.overlayText ?? null,
+        backgroundColor: parsed.backgroundColor,
         overlayTextColor: parsed.overlayTextColor,
         overlayFontSize: parsed.overlayFontSize,
         overlayFontFamily: parsed.overlayFontFamily,
@@ -142,6 +150,7 @@ export class PromotionsService {
     const current = await this.getPromotionOrThrow(promotionId);
     const parsed = parsePromotionWriteInput(input, { requireTitle: false });
     const candidate = buildCandidatePromotion(current, parsed, Boolean(input.assetUpload));
+    assertPromotionMode(candidate);
     if (current.status === PromotionStatus.ACTIVE) {
       assertCanActivate(candidate, now);
     }
@@ -247,6 +256,7 @@ export class PromotionsService {
       data: {
         assetUrl: uploaded.assetUrl,
         assetAltText: parsed.altText,
+        overlayText: null,
       },
     });
   }
@@ -300,6 +310,7 @@ function parsePromotionWriteInput(input: PromotionWriteInput, options: { readonl
   readonly assetUrl: string | null | undefined;
   readonly assetAltText: string | null | undefined;
   readonly overlayText: string | null | undefined;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: number;
   readonly overlayFontFamily: PromotionFontFamily;
@@ -311,7 +322,8 @@ function parsePromotionWriteInput(input: PromotionWriteInput, options: { readonl
   const title = parseRequiredText(input.title, "Promotion title", promotionTitleMaxLength, options.requireTitle);
   const body = parseRequiredText(input.body, "Promotion body", promotionBodyMaxLength, options.requireTitle);
   const overlayText = parseOptionalText(input.overlayText, "Overlay text", promotionOverlayMaxLength);
-  const overlayTextColor = parseColor(input.overlayTextColor ?? "#FFFFFF");
+  const backgroundColor = parseColor(input.backgroundColor ?? defaultPromotionBackgroundColor, "Promotion background color");
+  const overlayTextColor = parseColor(input.overlayTextColor ?? "#FFFFFF", "Overlay text color");
   const overlayFontSize = parseFontSize(input.overlayFontSize ?? 24);
   const overlayFontFamily = parseFontFamily(input.overlayFontFamily ?? "noto-sans-devanagari");
   const overlayFontStyle = parseFontStyle(input.overlayFontStyle ?? "bold");
@@ -335,6 +347,9 @@ function parsePromotionWriteInput(input: PromotionWriteInput, options: { readonl
   }
   if (input.overlayText !== undefined) {
     data.overlayText = overlayText ?? null;
+  }
+  if (input.backgroundColor !== undefined) {
+    data.backgroundColor = backgroundColor;
   }
   if (input.overlayTextColor !== undefined) {
     data.overlayTextColor = overlayTextColor;
@@ -361,6 +376,7 @@ function parsePromotionWriteInput(input: PromotionWriteInput, options: { readonl
     assetUrl,
     assetAltText,
     overlayText,
+    backgroundColor,
     overlayTextColor,
     overlayFontSize,
     overlayFontFamily,
@@ -420,10 +436,10 @@ function parseOptionalUrl(value: string | null | undefined): string | null | und
   return trimmed;
 }
 
-function parseColor(value: string): string {
+function parseColor(value: string, label: string): string {
   const trimmed = value.trim();
   if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
-    throw new BadRequestException("Overlay text color must be a six-character hex color.");
+    throw new BadRequestException(`${label} must be a six-character hex color.`);
   }
   return trimmed.toUpperCase();
 }
@@ -495,15 +511,22 @@ function assertAllUserTarget(value: PromotionWriteInput["targetPersona"]): void 
   }
 }
 
-function assertCanActivate(promotion: Pick<Promotion, "title" | "body" | "assetUrl" | "endsAt">, now: Date): void {
+function assertPromotionMode(promotion: Pick<Promotion, "assetUrl" | "overlayText">): void {
+  if (promotion.assetUrl?.trim() && promotion.overlayText?.trim()) {
+    throw new BadRequestException("Promotion can use either an image or overlaid text, not both.");
+  }
+}
+
+function assertCanActivate(promotion: Pick<Promotion, "title" | "body" | "assetUrl" | "overlayText" | "endsAt">, now: Date): void {
   if (!promotion.title.trim()) {
     throw new BadRequestException("Promotion title is required before activation.");
   }
   if (!promotion.body.trim()) {
     throw new BadRequestException("Promotion body is required before activation.");
   }
-  if (!promotion.assetUrl?.trim()) {
-    throw new BadRequestException("Upload or add a promotion image before activation.");
+  assertPromotionMode(promotion);
+  if (!promotion.assetUrl?.trim() && !promotion.overlayText?.trim()) {
+    throw new BadRequestException("Add a promotion image or overlaid text before activation.");
   }
   if (promotion.endsAt && promotion.endsAt <= now) {
     throw new BadRequestException("Promotion expiry must be in the future before activation.");
@@ -514,7 +537,7 @@ function buildCandidatePromotion(
   current: Promotion,
   parsed: ReturnType<typeof parsePromotionWriteInput>,
   hasUpload: boolean,
-): Pick<Promotion, "title" | "body" | "assetUrl" | "endsAt"> {
+): Pick<Promotion, "title" | "body" | "assetUrl" | "overlayText" | "endsAt"> {
   return {
     title: parsed.data.title === undefined ? current.title : String(parsed.data.title),
     body: parsed.data.body === undefined ? current.body : String(parsed.data.body),
@@ -523,6 +546,7 @@ function buildCandidatePromotion(
       : parsed.data.assetUrl === undefined
         ? current.assetUrl
         : (parsed.data.assetUrl as string | null),
+    overlayText: parsed.data.overlayText === undefined ? current.overlayText : (parsed.data.overlayText as string | null),
     endsAt: parsed.data.endsAt === undefined ? current.endsAt : (parsed.data.endsAt as Date | null),
   };
 }
@@ -536,6 +560,7 @@ function mapAdminPromotion(promotion: Promotion): AdminPromotionView {
     ...(assetUrl ? { assetUrl } : {}),
     ...(promotion.assetAltText ? { assetAltText: promotion.assetAltText } : {}),
     ...(promotion.overlayText ? { overlayText: promotion.overlayText } : {}),
+    backgroundColor: parseColor(promotion.backgroundColor || defaultPromotionBackgroundColor, "Promotion background color"),
     overlayTextColor: promotion.overlayTextColor,
     overlayFontSize: promotion.overlayFontSize,
     overlayFontFamily: normalizeFontFamily(promotion.overlayFontFamily),
@@ -560,6 +585,7 @@ function mapPromotionBanner(promotion: Promotion): PromotionBannerView {
     ...(mapped.assetUrl ? { assetUrl: mapped.assetUrl } : {}),
     ...(mapped.assetAltText ? { assetAltText: mapped.assetAltText } : {}),
     ...(mapped.overlayText ? { overlayText: mapped.overlayText } : {}),
+    backgroundColor: mapped.backgroundColor,
     overlayTextColor: mapped.overlayTextColor,
     overlayFontSize: mapped.overlayFontSize,
     overlayFontFamily: mapped.overlayFontFamily,
@@ -581,6 +607,7 @@ function promotionAuditSnapshot(promotion: Promotion): Prisma.InputJsonObject {
     targetPersona: promotion.targetPersona,
     assetUrl: promotion.assetUrl,
     overlayText: promotion.overlayText,
+    backgroundColor: promotion.backgroundColor,
     overlayFontFamily: promotion.overlayFontFamily,
     marqueeEnabled: promotion.marqueeEnabled,
     endsAt: promotion.endsAt?.toISOString() ?? null,

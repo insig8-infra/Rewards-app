@@ -1,4 +1,4 @@
-export type AdminRole = "OWNER" | "STAFF";
+export type AdminRole = "OWNER" | "ADMIN" | "STAFF";
 
 export type AdminTab = "Dashboard" | "ReturnScan" | "Contractors" | "Rewards" | "Reports";
 
@@ -12,4 +12,8 @@ export function tabsForRole(role: AdminRole): readonly AdminTab[] {
 
 export function canUseOwnerAction(role: AdminRole): boolean {
   return role === "OWNER";
+}
+
+export function canUseManagerAction(role: AdminRole): boolean {
+  return role === "OWNER" || role === "ADMIN";
 }

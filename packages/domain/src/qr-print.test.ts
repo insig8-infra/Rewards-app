@@ -8,7 +8,7 @@ import {
   getPrintableQuantity,
 } from "./index.js";
 
-test("assertCanPrintQr allows OWNER and STAFF to print available units", () => {
+test("assertCanPrintQr allows OWNER, ADMIN, and STAFF to print available units", () => {
   const availability = {
     invoiceLineId: "line_1",
     totalQuantity: 10,
@@ -20,6 +20,9 @@ test("assertCanPrintQr allows OWNER and STAFF to print available units", () => {
 
   assert.doesNotThrow(() =>
     assertCanPrintQr(ACTOR_ROLE.OWNER, [{ invoiceLineId: "line_1", quantity: 8 }], [availability]),
+  );
+  assert.doesNotThrow(() =>
+    assertCanPrintQr(ACTOR_ROLE.ADMIN, [{ invoiceLineId: "line_1", quantity: 8 }], [availability]),
   );
   assert.doesNotThrow(() =>
     assertCanPrintQr(ACTOR_ROLE.STAFF, [{ invoiceLineId: "line_1", quantity: 8 }], [availability]),

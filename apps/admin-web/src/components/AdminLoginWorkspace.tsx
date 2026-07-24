@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, Eye, EyeOff, KeyRound, Loader2, LogIn, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { Boxes, Eye, EyeOff, KeyRound, Loader2, LogIn, Phone, ShieldCheck, UserCog, UserRound } from "lucide-react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -113,6 +113,16 @@ export function AdminLoginWorkspace({ expired, nextPath }: AdminLoginWorkspacePr
             >
               <UserRound size={16} aria-hidden="true" />
               Owner
+            </button>
+            <button
+              aria-selected={form.role === "ADMIN"}
+              className={form.role === "ADMIN" ? "active" : ""}
+              onClick={() => setForm((current) => ({ ...current, role: "ADMIN" }))}
+              role="tab"
+              type="button"
+            >
+              <UserCog size={16} aria-hidden="true" />
+              Admin
             </button>
             <button
               aria-selected={form.role === "STAFF"}

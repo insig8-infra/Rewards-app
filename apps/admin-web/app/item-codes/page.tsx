@@ -2,7 +2,7 @@ import { AdminItemCodesWorkspace } from "../../src/components/AdminItemCodesWork
 import { requireAdminSession } from "../../src/auth/adminSession";
 
 export default async function ItemCodesPage() {
-  const session = await requireAdminSession({ allowedRoles: ["OWNER", "STAFF"], loginRedirectTo: "/item-codes" });
+  const session = await requireAdminSession({ allowedRoles: ["OWNER", "ADMIN", "STAFF"], loginRedirectTo: "/item-codes" });
 
   return <AdminItemCodesWorkspace session={session} />;
 }

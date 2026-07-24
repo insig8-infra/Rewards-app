@@ -1,5 +1,7 @@
 declare const process: { env?: Record<string, string | undefined> };
 
+import { normalizeNetworkError } from "./offline";
+
 const defaultApiBaseUrl = "http://127.0.0.1:3000/api";
 
 export const apiBaseUrl = process.env?.EXPO_PUBLIC_API_BASE_URL ?? defaultApiBaseUrl;
@@ -222,6 +224,7 @@ export interface PromotionBanner {
   readonly assetUrl?: string;
   readonly assetAltText?: string;
   readonly overlayText?: string;
+  readonly backgroundColor: string;
   readonly overlayTextColor: string;
   readonly overlayFontSize: number;
   readonly overlayFontFamily: PromotionFontFamily;
@@ -411,15 +414,20 @@ async function patchJson<T>(path: string, body: unknown, token?: string): Promis
 }
 
 async function requestJson<T>(method: "GET" | "POST" | "PATCH", path: string, body?: unknown, token?: string): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (error) {
+    throw normalizeNetworkError(error);
+  }
 
   const payload = await readJson(response);
   if (!response.ok) {

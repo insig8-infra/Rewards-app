@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createAdminApiClient } from "./adminApi";
+import { AdminApiError, createAdminApiClient } from "./adminApi";
 
 test("admin API client centralizes actor headers and keeps QR print body clean", async () => {
   const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
@@ -35,6 +35,34 @@ test("admin API client centralizes actor headers and keeps QR print body clean",
   });
 });
 
+test("admin API client exposes structured backend error messages instead of raw JSON", async () => {
+  const client = createAdminApiClient({
+    apiBaseUrl: "http://api.test",
+    actor: { role: "STAFF", userId: "staff_user_1" },
+    fetcher: async () =>
+      new Response(
+        JSON.stringify({
+          statusCode: 400,
+          message: "ItemCode must be synced before QR print.",
+          code: "ITEM_CODE_NOT_FOUND_FOR_PRINT",
+        }),
+        { status: 400, statusText: "Bad Request" },
+      ),
+  });
+
+  await assert.rejects(
+    () => client.printQr("invoice_1", [{ invoiceLineId: "line_1", quantity: 2 }], "2026-06-22T00:00:00.000Z"),
+    (error: unknown) => {
+      assert.ok(error instanceof AdminApiError);
+      assert.equal(error.status, 400);
+      assert.equal(error.code, "ITEM_CODE_NOT_FOUND_FOR_PRINT");
+      assert.equal(error.message, "ItemCode must be synced before QR print.");
+      assert.doesNotMatch(error.message, /^API 400:/);
+      return true;
+    },
+  );
+});
+
 test("admin API client reads persisted invoice detail and print history with actor headers", async () => {
   const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
   const client = createAdminApiClient({
@@ -54,7 +82,9 @@ test("admin API client reads persisted invoice detail and print history with act
   await client.listContractors();
   await client.getContractorDetail("contractor_1");
   await client.listStaff();
+  await client.listAdmins();
   await client.getStaffDetail("staff_1");
+  await client.getAdminDetail("admin_1");
   await client.getMyStaffProfile();
 
   assert.equal(calls[0]?.url, "http://api.test/admin-web/invoices");
@@ -68,10 +98,12 @@ test("admin API client reads persisted invoice detail and print history with act
   assert.equal(calls[5]?.url, "http://api.test/admin-web/contractors");
   assert.equal(calls[6]?.url, "http://api.test/admin-web/contractors/contractor_1");
   assert.equal(calls[7]?.url, "http://api.test/admin-web/staff");
-  assert.equal(calls[8]?.url, "http://api.test/admin-web/staff/staff_1");
-  assert.equal(calls[9]?.url, "http://api.test/admin-web/staff/me");
-  assert.equal((calls[9]?.init.headers as Record<string, string>)["x-actor-role"], "OWNER");
-  assert.equal((calls[9]?.init.headers as Record<string, string>)["x-actor-user-id"], "owner_user_1");
+  assert.equal(calls[8]?.url, "http://api.test/admin-web/admins");
+  assert.equal(calls[9]?.url, "http://api.test/admin-web/staff/staff_1");
+  assert.equal(calls[10]?.url, "http://api.test/admin-web/admins/admin_1");
+  assert.equal(calls[11]?.url, "http://api.test/admin-web/staff/me");
+  assert.equal((calls[11]?.init.headers as Record<string, string>)["x-actor-role"], "OWNER");
+  assert.equal((calls[11]?.init.headers as Record<string, string>)["x-actor-user-id"], "owner_user_1");
 });
 
 test("admin API client reads BUSY sync status and triggers mock BUSY sync", async () => {
@@ -169,6 +201,7 @@ test("admin API client writes staff mutations with actor headers", async () => {
           staff: {
             staffId: "staff_1",
             userId: "user_1",
+            role: "STAFF",
             name: "Priya Sharma",
             mobileNumber: "9876543210",
             status: "ACTIVE",
@@ -182,11 +215,15 @@ test("admin API client writes staff mutations with actor headers", async () => {
   });
 
   await client.createStaff({ name: "Priya Sharma", mobileNumber: "9876543210", photoUrl: "data:image/jpeg;base64,staff" });
+  await client.createAdmin({ name: "Rohit Iyer", mobileNumber: "9000000093" });
   await client.updateStaffPhoto("staff_1", { photoUrl: "data:image/jpeg;base64,owner" });
   await client.updateMyStaffPhoto({ photoUrl: "data:image/jpeg;base64,self" });
   await client.resetStaffPin("staff_1");
+  await client.resetAdminPin("admin_1");
   await client.deactivateStaff("staff_1");
+  await client.deactivateAdmin("admin_1");
   await client.reactivateStaff("staff_1");
+  await client.reactivateAdmin("admin_1");
 
   assert.equal(calls[0]?.url, "http://api.test/admin-web/staff");
   assert.equal(calls[0]?.init.method, "POST");
@@ -195,17 +232,25 @@ test("admin API client writes staff mutations with actor headers", async () => {
     mobileNumber: "9876543210",
     photoUrl: "data:image/jpeg;base64,staff",
   });
-  assert.equal(calls[1]?.url, "http://api.test/admin-web/staff/staff_1/photo");
-  assert.deepEqual(JSON.parse(String(calls[1]?.init.body)), { photoUrl: "data:image/jpeg;base64,owner" });
-  assert.equal(calls[2]?.url, "http://api.test/admin-web/staff/me/photo");
-  assert.deepEqual(JSON.parse(String(calls[2]?.init.body)), { photoUrl: "data:image/jpeg;base64,self" });
-  assert.equal(calls[3]?.url, "http://api.test/admin-web/staff/staff_1/reset-pin");
-  assert.equal(calls[4]?.url, "http://api.test/admin-web/staff/staff_1/deactivate");
-  assert.equal(calls[5]?.url, "http://api.test/admin-web/staff/staff_1/reactivate");
-  assert.equal((calls[5]?.init.headers as Record<string, string>)["x-actor-user-id"], "owner_user_1");
+  assert.equal(calls[1]?.url, "http://api.test/admin-web/admins");
+  assert.deepEqual(JSON.parse(String(calls[1]?.init.body)), {
+    name: "Rohit Iyer",
+    mobileNumber: "9000000093",
+  });
+  assert.equal(calls[2]?.url, "http://api.test/admin-web/staff/staff_1/photo");
+  assert.deepEqual(JSON.parse(String(calls[2]?.init.body)), { photoUrl: "data:image/jpeg;base64,owner" });
+  assert.equal(calls[3]?.url, "http://api.test/admin-web/staff/me/photo");
+  assert.deepEqual(JSON.parse(String(calls[3]?.init.body)), { photoUrl: "data:image/jpeg;base64,self" });
+  assert.equal(calls[4]?.url, "http://api.test/admin-web/staff/staff_1/reset-pin");
+  assert.equal(calls[5]?.url, "http://api.test/admin-web/admins/admin_1/reset-pin");
+  assert.equal(calls[6]?.url, "http://api.test/admin-web/staff/staff_1/deactivate");
+  assert.equal(calls[7]?.url, "http://api.test/admin-web/admins/admin_1/deactivate");
+  assert.equal(calls[8]?.url, "http://api.test/admin-web/staff/staff_1/reactivate");
+  assert.equal(calls[9]?.url, "http://api.test/admin-web/admins/admin_1/reactivate");
+  assert.equal((calls[9]?.init.headers as Record<string, string>)["x-actor-user-id"], "owner_user_1");
 });
 
-test("admin API client writes reward fulfillment calls with OWNER actor headers", async () => {
+test("admin API client writes reward fulfillment calls with admin actor headers", async () => {
   const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
   const claimLookup = {
     claim: {
@@ -379,14 +424,14 @@ test("admin API client reads reports and exports binary files with OWNER actor h
   assert.equal(download.contentType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 });
 
-test("admin API client manages promotions through OWNER-only endpoints", async () => {
+test("admin API client manages promotions through guarded admin endpoints", async () => {
   const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
   const promotion = {
     promotionId: "promo_1",
     title: "NEW SALE IS ON!",
     body: "Earn extra rewards this week.",
     assetUrl: "https://example.test/banner.jpg",
-    overlayText: "NEW SALE IS ON!",
+    backgroundColor: "#00535B",
     overlayTextColor: "#FFFFFF",
     overlayFontSize: 28,
     overlayFontFamily: "noto-sans-devanagari",
@@ -411,7 +456,8 @@ test("admin API client manages promotions through OWNER-only endpoints", async (
     title: "NEW SALE IS ON!",
     body: "Earn extra rewards this week.",
     assetUrl: "https://example.test/banner.jpg",
-    overlayText: "NEW SALE IS ON!",
+    overlayText: null,
+    backgroundColor: "#00535B",
     overlayTextColor: "#FFFFFF",
     overlayFontSize: 28,
     overlayFontFamily: "hind",
@@ -431,7 +477,8 @@ test("admin API client manages promotions through OWNER-only endpoints", async (
     title: "NEW SALE IS ON!",
     body: "Earn extra rewards this week.",
     assetUrl: "https://example.test/banner.jpg",
-    overlayText: "NEW SALE IS ON!",
+    overlayText: null,
+    backgroundColor: "#00535B",
     overlayTextColor: "#FFFFFF",
     overlayFontSize: 28,
     overlayFontFamily: "hind",

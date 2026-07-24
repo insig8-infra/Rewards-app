@@ -1,11 +1,11 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import type { AdminLoginResponse } from "./api";
+import type { AdminLoginResponse, AdminRole } from "./api";
 
 export interface StoredAdminSession {
   readonly token: string;
   readonly expiresAt: string;
-  readonly role: "OWNER" | "STAFF";
+  readonly role: AdminRole;
   readonly userId: string;
   readonly name: string;
   readonly mobileNumber: string;

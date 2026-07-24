@@ -176,8 +176,8 @@ function isActiveUnscannedQrStatus(status: QrUnit["status"]): boolean {
 }
 
 function assertOwnerOrStaff(actorRole: ActorRole, code: string): void {
-  if (actorRole !== ACTOR_ROLE.OWNER && actorRole !== ACTOR_ROLE.STAFF) {
-    throw new DomainError(code, "Only OWNER or STAFF can perform this QR operation.");
+  if (actorRole !== ACTOR_ROLE.OWNER && actorRole !== ACTOR_ROLE.ADMIN && actorRole !== ACTOR_ROLE.STAFF) {
+    throw new DomainError(code, "Only OWNER, ADMIN, or STAFF can perform this QR operation.");
   }
 }
 

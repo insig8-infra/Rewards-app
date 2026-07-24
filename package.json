@@ -17,16 +17,20 @@
     "typecheck": "npm run typecheck --workspace @volt-rewards/domain && npm run typecheck --workspace @volt-rewards/api && npm run typecheck --workspace @volt-rewards/admin-web && npm run typecheck --workspace @volt-rewards/mobile && npm run typecheck --workspace @volt-rewards/admin-mobile",
     "lint": "npm run lint --workspace @volt-rewards/domain && npm run lint --workspace @volt-rewards/api && npm run lint --workspace @volt-rewards/admin-web && npm run lint --workspace @volt-rewards/mobile && npm run lint --workspace @volt-rewards/admin-mobile",
     "api:start": "npm run build --workspace @volt-rewards/api && npm run start --workspace @volt-rewards/api",
-    "runtime:check": "node tools/verify-local-runtime.mjs"
+    "runtime:check": "node tools/verify-local-runtime.mjs",
+    "uat:mobile-visual-proof": "node tools/phase59-mobile-visual-proof.mjs",
+    "uat:report-export-check": "node tools/phase59-report-export-readiness.mjs"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/node": "24.10.1",
-    "prisma": "7.8.0",
+    "prisma": "7.9.0",
     "tsx": "4.22.4",
     "typescript": "5.9.3"
   },
   "overrides": {
-    "@hono/node-server": "1.19.13"
+    "@hono/node-server": "1.19.13",
+    "fast-uri": "3.1.4"
   },
   "engines": {
     "node": ">=24"
