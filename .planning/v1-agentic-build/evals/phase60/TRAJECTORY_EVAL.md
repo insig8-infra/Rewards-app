@@ -14,8 +14,9 @@ Status: Pass with one explicit deployment-access limitation.
 ## Decision Notes
 
 - Mobile app laptop links use Expo web exports as demo surfaces; native iOS/Android builds remain the App Store / Play Store path.
-- Railway services should be separate services from the same GitHub repo, each with a service-specific Dockerfile path.
+- Railway services should be separate services from the same GitHub repo, each with a native service-specific build command, start command, variables, and healthcheck.
 - Expo `EXPO_PUBLIC_API_BASE_URL` is treated as a build-time variable; any variable change requires redeploy.
+- After Railway showed frontend services inheriting the API Dockerfile config from root `railway.json`, the root config was changed to `RAILPACK` and Dockerfile path/healthcheck inheritance was removed.
 
 ## Limitation
 

@@ -17,25 +17,29 @@ The live API remains:
 
 ## Railway Service Setup
 
-Use the same GitHub repo for all services. Each service must point to its own Dockerfile.
+Use the same GitHub repo for all services. Keep `Root Directory` as `/` for every service because this is a shared npm-workspaces monorepo.
 
-| Railway service | Purpose | Dockerfile path | Required variables |
-| --- | --- | --- | --- |
-| `@volt-rewards/api` | Backend API | `apps/api/Dockerfile` | Existing API variables, `HOST=0.0.0.0`, `API_PUBLIC_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `CORS_ORIGIN=<comma-separated frontend URLs>` |
-| `@volt-rewards/admin-web` | Admin Web Portal | `apps/admin-web/Dockerfile` | `ADMIN_WEB_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `NEXT_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
-| `@volt-rewards/mobile` | End-user app laptop demo | `apps/mobile/Dockerfile` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
-| `@volt-rewards/admin-mobile` | Admin Mobile laptop demo | `apps/admin-mobile/Dockerfile` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
+The repo-level `railway.json` intentionally uses Railway's native `RAILPACK` builder and does not set a Dockerfile path or healthcheck. Each service must define its own build command, start command, variables, and healthcheck in Railway service settings.
+
+| Railway service | Purpose | Build command | Start command | Healthcheck | Required variables |
+| --- | --- | --- | --- | --- | --- |
+| `@volt-rewards/api` | Backend API | `npm run build --workspace @volt-rewards/api` | `npm run start --workspace @volt-rewards/api` | `/api/health` | Existing API variables, `HOST=0.0.0.0`, `API_PUBLIC_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `CORS_ORIGIN=<comma-separated frontend URLs>` |
+| `@volt-rewards/admin-web` | Admin Web Portal | `npm run build --workspace @volt-rewards/admin-web` | `npm run start --workspace @volt-rewards/admin-web` | `/` | `ADMIN_WEB_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `NEXT_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api` |
+| `@volt-rewards/mobile` | End-user app laptop demo | `npm run export:web --workspace @volt-rewards/mobile` | `node tools/serve-static.mjs` | `/` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `STATIC_ROOT=apps/mobile/dist` |
+| `@volt-rewards/admin-mobile` | Admin Mobile laptop demo | `npm run export:web --workspace @volt-rewards/admin-mobile` | `node tools/serve-static.mjs` | `/` | `EXPO_PUBLIC_API_BASE_URL=https://volt-rewardsapi-production.up.railway.app/api`, `STATIC_ROOT=apps/admin-mobile/dist` |
 
 ## Railway UI Steps
 
 1. Open the Railway project.
-2. For each frontend service, open `Settings`.
-3. Set the Dockerfile path to the matching path above.
-   - If using variables instead of the Settings field, set `RAILWAY_DOCKERFILE_PATH` to the matching Dockerfile path.
-4. Open `Variables` and add the required variables for that service.
-5. Deploy the staged changes.
-6. Open `Settings` -> `Networking` and generate a public Railway domain for each frontend service.
-7. After the three frontend domains exist, update the API service `CORS_ORIGIN` to include them as a comma-separated list and redeploy the API service.
+2. For each service, open `Settings` -> `Source` and connect the GitHub repo `insig8-infra/Rewards-app`.
+3. Keep `Root Directory` as `/`.
+4. Open `Settings` -> `Build` and make sure the builder is Railway native/Railpack, not Dockerfile.
+5. Remove any `RAILWAY_DOCKERFILE_PATH` variable from frontend services.
+6. Remove any Dockerfile path such as `apps/api/Dockerfile`, `apps/mobile/Dockerfile`, `apps/admin-mobile/Dockerfile`, or `apps/admin-web/Dockerfile` from frontend service settings.
+7. Set each service's build command, start command, healthcheck path, and variables from the table above.
+8. Deploy the staged changes.
+9. Open `Settings` -> `Networking` and generate a public Railway domain for each frontend service.
+10. After the three frontend domains exist, update the API service `CORS_ORIGIN` to include them as a comma-separated list and redeploy the API service.
 
 ## Expected Client Links
 
@@ -63,3 +67,4 @@ Before sending links to the client:
 - Expo mobile web builds bake `EXPO_PUBLIC_API_BASE_URL` during build, so redeploy after changing that variable.
 - Admin Web uses server-side proxy routes and should use `ADMIN_WEB_API_BASE_URL` for Railway.
 - The mobile web links are laptop-friendly demos of the mobile apps. Native iOS/Android builds remain a separate Expo EAS/App Store and Play Store path.
+- If a deployment detail still shows `Builder: Dockerfile`, the service is still inheriting old Docker config or has `RAILWAY_DOCKERFILE_PATH` set. Fix that before redeploying.

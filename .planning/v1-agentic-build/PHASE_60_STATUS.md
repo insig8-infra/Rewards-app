@@ -10,6 +10,8 @@ Plan: `PHASE_60_RAILWAY_CLIENT_DEMO_DEPLOYMENT_PLAN.md`
 - Updated Admin Web start command to bind to Railway's `PORT`.
 - Added Expo web export scripts for both mobile apps.
 - Added `client-deliverables/RAILWAY_CLIENT_DEMO_DEPLOYMENT_RUNBOOK.md`.
+- Updated the Railway direction to native Railpack build/start commands after Railway applied the repo-level API Dockerfile config to frontend services.
+- Changed root `railway.json` so it no longer points all services at `apps/api/Dockerfile` or `/api/health`.
 
 ## Verification
 
@@ -25,5 +27,6 @@ Plan: `PHASE_60_RAILWAY_CLIENT_DEMO_DEPLOYMENT_PLAN.md`
 
 ## Pending Deployment Verification
 
-- Git push to trigger Railway builds.
+- Git push with native Railway config.
+- Railway frontend services show `Builder: Railpack` or native builder, not `Dockerfile`.
 - Railway generated frontend public domains.
